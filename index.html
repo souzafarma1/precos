@@ -17,6 +17,7 @@
             --azul: #003399; 
             --cinza-fundo: #f4f4f4;
             --preto-relogio: #222;
+            --verde-estoque: #28a745;
         }
 
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza-fundo); padding-bottom: 50px; }
@@ -65,6 +66,8 @@
         td { padding: 16px; border-bottom: 1px solid #eee; }
         .info-prod { font-weight: bold; font-size: 18px; color: #111; display: block; }
         .info-lab { color: #666; font-size: 14px; font-style: italic; }
+        /* NOVO ESTILO ESTOQUE */
+        .info-estoque { color: var(--verde-estoque); font-size: 14px; font-weight: bold; display: block; margin-top: 3px; }
         .info-cod { font-family: 'Courier New', monospace; font-size: 12px; color: #999; margin-top: 5px; display: block; }
         .preco { color: var(--vermelho); font-weight: bold; font-size: 26px; text-align: right; }
 
@@ -109,6 +112,7 @@
     <div id="aba-cadastro" class="tab-content">
         <div class="card-adm">
             <h3>Painel Administrativo</h3>
+            <p style="font-size: 12px; color: #666;">O arquivo Excel deve conter uma coluna com nome: <b>estoque</b> ou <b>qtd</b></p>
             <input type="file" id="fileInput" accept=".xlsx, .xls">
             <br><br>
             <button class="btn-adm" style="background: #28a745;" onclick="uploadExcelFirebase()">🚀 ATUALIZAR PREÇOS ONLINE</button>
@@ -181,6 +185,7 @@
                 <td>
                     <span class="info-prod">${p.nome}</span>
                     <span class="info-lab">${p.lab || '-'}</span>
+                    <span class="info-estoque">📦 Estoque: ${p.estoque || '0'}</span>
                     <span class="info-cod">B: ${p.barras} | ID: ${p.id}</span>
                 </td>
                 <td class="preco">R$ ${p.preco}</td>
@@ -206,7 +211,7 @@
         if (scannerObjeto) scannerObjeto.stop().then(() => document.getElementById('reader').style.display = 'none');
     }
 
-    // --- 7. UPLOAD (CORRIGIDO PREÇO) ---
+    // --- 7. UPLOAD (COM ESTOQUE) ---
     function uploadExcelFirebase() {
         const file = document.getElementById('fileInput').files[0];
         if (!file) return alert("Selecione o arquivo!");
@@ -231,7 +236,8 @@
                     lab: getV(['laboratorio', 'lab', 'fabricante']),
                     barras: getV(['codigo_barras', 'barras', 'ean']),
                     id: getV(['codigo_interno', 'id', 'codigo']),
-                    preco: pBruto
+                    preco: pBruto,
+                    estoque: getV(['estoque', 'qtd', 'quantidade', 'disponivel', 'est']) || "0"
                 };
             });
 
@@ -247,4 +253,3 @@
 </script>
 </body>
 </html>
-
