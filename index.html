@@ -22,7 +22,6 @@
 
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza-fundo); padding-bottom: 50px; }
         
-        /* BARRA DE RELÓGIO ONLINE */
         .live-clock-bar { 
             background: var(--preto-relogio); 
             color: var(--amarelo); 
@@ -34,7 +33,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
-        /* CABEÇALHO COMPLETO */
         .header { background: white; text-align: center; padding: 25px 15px; border-bottom: 6px solid var(--vermelho); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .logo { max-width: 200px; margin-bottom: 10px; }
         .header h1 { color: var(--vermelho); margin: 5px 0; font-size: 30px; font-weight: 800; text-transform: uppercase; }
@@ -43,7 +41,6 @@
 
         .container { max-width: 900px; margin: 0 auto; padding: 15px; }
 
-        /* ABAS */
         .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; }
         .tab-btn { padding: 14px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px; flex: 1; font-size: 15px; transition: 0.3s; }
         .tab-btn.active { background: var(--vermelho); color: white; box-shadow: 0 4px 8px rgba(227, 6, 19, 0.3); }
@@ -52,26 +49,25 @@
         .tab-content.active { display: block; animation: fadeIn 0.4s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* ÁREA DE BUSCA */
         .search-area { display: flex; gap: 10px; background: var(--amarelo); padding: 18px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .search-area input { flex: 1; padding: 15px; font-size: 20px; border-radius: 8px; border: none; outline: none; }
         .btn-scan { background: var(--azul); color: white; border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-size: 24px; }
 
-        /* SCANNER */
         #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 15px; border: 3px solid var(--azul); display: none; background: #000; }
 
-        /* TABELA */
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
-        th { background: #333; color: white; padding: 12px; text-align: left; }
         td { padding: 16px; border-bottom: 1px solid #eee; }
         .info-prod { font-weight: bold; font-size: 18px; color: #111; display: block; }
         .info-lab { color: #666; font-size: 14px; font-style: italic; }
-        /* NOVO ESTILO ESTOQUE */
-        .info-estoque { color: var(--verde-estoque); font-size: 14px; font-weight: bold; display: block; margin-top: 3px; }
+        
+        /* Estilo Dinâmico do Estoque */
+        .info-estoque { font-size: 14px; font-weight: bold; display: block; margin-top: 3px; }
+        .estoque-ok { color: var(--verde-estoque); }
+        .estoque-zero { color: var(--vermelho); }
+
         .info-cod { font-family: 'Courier New', monospace; font-size: 12px; color: #999; margin-top: 5px; display: block; }
         .preco { color: var(--vermelho); font-weight: bold; font-size: 26px; text-align: right; }
 
-        /* CADASTRO */
         .card-adm { background: white; padding: 35px; border-radius: 12px; text-align: center; border: 1px solid #ddd; }
         .btn-adm { padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; margin: 10px; font-size: 16px; }
         .last-sync { font-size: 12px; color: #666; margin-bottom: 15px; text-align: center; }
@@ -112,10 +108,10 @@
     <div id="aba-cadastro" class="tab-content">
         <div class="card-adm">
             <h3>Painel Administrativo</h3>
-            <p style="font-size: 12px; color: #666;">O arquivo Excel deve conter uma coluna com nome: <b>estoque</b> ou <b>qtd</b></p>
+            <p style="font-size: 13px; color: #444;">Suporta arquivos <b>.xlsx</b> e <b>.xls</b></p>
             <input type="file" id="fileInput" accept=".xlsx, .xls">
             <br><br>
-            <button class="btn-adm" style="background: #28a745;" onclick="uploadExcelFirebase()">🚀 ATUALIZAR PREÇOS ONLINE</button>
+            <button class="btn-adm" style="background: #28a745;" onclick="uploadExcelFirebase()">🚀 ATUALIZAR PREÇOS E ESTOQUE</button>
             <button class="btn-adm" style="background: var(--vermelho);" onclick="resetarBancoDados()">🗑️ LIMPAR TUDO</button>
             <div id="feedbackUpload" style="margin-top: 15px; font-weight: bold;"></div>
         </div>
@@ -139,20 +135,17 @@
     let listaProdutos = [];
     let scannerObjeto;
 
-    // --- 2. RELÓGIO ONLINE ---
     setInterval(() => {
         const agora = new Date();
         document.getElementById('relogioOnline').innerText = agora.toLocaleDateString('pt-BR') + " | " + agora.toLocaleTimeString('pt-BR');
     }, 1000);
 
-    // --- 3. SINCRONIZAÇÃO ---
     db.ref('/').on('value', (snapshot) => {
         const dados = snapshot.val() || {};
         listaProdutos = dados.produtos || [];
         document.getElementById('statusSync').innerText = `Atualizado em: ${dados.ultima_atualizacao || '---'}`;
     });
 
-    // --- 4. SEGURANÇA E ABAS ---
     function mudarAba(id) {
         if(scannerObjeto) fecharScanner();
         document.querySelectorAll('.tab-content, .tab-btn').forEach(el => el.classList.remove('active'));
@@ -165,7 +158,6 @@
         else alert("Acesso Negado.");
     }
 
-    // --- 5. BUSCA ---
     function fazerBusca(t) {
         const input = document.getElementById('searchInput');
         if(t) input.value = t;
@@ -180,20 +172,26 @@
         );
 
         aviso.style.display = "none";
-        corpo.innerHTML = res.slice(0, 50).map(p => `
-            <tr>
-                <td>
-                    <span class="info-prod">${p.nome}</span>
-                    <span class="info-lab">${p.lab || '-'}</span>
-                    <span class="info-estoque">📦 Estoque: ${p.estoque || '0'}</span>
-                    <span class="info-cod">B: ${p.barras} | ID: ${p.id}</span>
-                </td>
-                <td class="preco">R$ ${p.preco}</td>
-            </tr>
-        `).join('');
+        corpo.innerHTML = res.slice(0, 50).map(p => {
+            // Lógica de alerta visual para estoque
+            const qtd = parseInt(p.estoque) || 0;
+            const classeEstoque = qtd > 0 ? "estoque-ok" : "estoque-zero";
+            const textoEstoque = qtd > 0 ? `📦 Estoque: ${qtd}` : "❌ Sem Estoque / Zerado";
+
+            return `
+                <tr>
+                    <td>
+                        <span class="info-prod">${p.nome}</span>
+                        <span class="info-lab">${p.lab || '-'}</span>
+                        <span class="info-estoque ${classeEstoque}">${textoEstoque}</span>
+                        <span class="info-cod">B: ${p.barras} | ID: ${p.id}</span>
+                    </td>
+                    <td class="preco">R$ ${p.preco}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
-    // --- 6. SCANNER ---
     function alternarCamera() {
         const r = document.getElementById('reader');
         if (r.style.display === 'block') fecharScanner();
@@ -211,44 +209,51 @@
         if (scannerObjeto) scannerObjeto.stop().then(() => document.getElementById('reader').style.display = 'none');
     }
 
-    // --- 7. UPLOAD (COM ESTOQUE) ---
     function uploadExcelFirebase() {
         const file = document.getElementById('fileInput').files[0];
         if (!file) return alert("Selecione o arquivo!");
 
         const leitor = new FileReader();
         leitor.onload = function(e) {
-            const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
-            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            try {
+                const data = new Uint8Array(e.target.result);
+                const wb = XLSX.read(data, {type: 'array'});
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(ws);
 
-            const listaFinal = json.map(item => {
-                const getV = (n) => {
-                    const k = Object.keys(item).find(x => n.includes(x.toLowerCase().trim()));
-                    return k ? item[k] : "";
-                };
+                const listaFinal = json.map(item => {
+                    const getV = (n) => {
+                        const k = Object.keys(item).find(x => n.includes(x.toLowerCase().trim()));
+                        return k ? item[k] : "";
+                    };
 
-                // Lógica de Limpeza de Preço
-                let pBruto = String(getV(['preco', 'valor', 'venda', 'preço'])).replace('R$', '').trim();
-                if (!pBruto.includes(',') && !pBruto.includes('.')) pBruto += ",00";
+                    let pBruto = String(getV(['preco', 'valor', 'venda', 'preço'])).replace('R$', '').trim();
+                    if (!pBruto.includes(',') && !pBruto.includes('.')) pBruto += ",00";
 
-                return {
-                    nome: getV(['nome', 'produto', 'descricao']),
-                    lab: getV(['laboratorio', 'lab', 'fabricante']),
-                    barras: getV(['codigo_barras', 'barras', 'ean']),
-                    id: getV(['codigo_interno', 'id', 'codigo']),
-                    preco: pBruto,
-                    estoque: getV(['estoque', 'qtd', 'quantidade', 'disponivel', 'est']) || "0"
-                };
-            });
+                    return {
+                        nome: getV(['nome', 'produto', 'descricao']),
+                        lab: getV(['laboratorio', 'lab', 'fabricante']),
+                        barras: getV(['codigo_barras', 'barras', 'ean']),
+                        id: getV(['codigo_interno', 'id', 'codigo']),
+                        preco: pBruto,
+                        estoque: getV(['estoque', 'qtd', 'quantidade', 'disponivel']) || "0"
+                    };
+                });
 
-            db.ref('/').set({ produtos: listaFinal, ultima_atualizacao: new Date().toLocaleString('pt-BR') })
-              .then(() => alert("Sincronizado!"));
+                db.ref('/').set({ produtos: listaFinal, ultima_atualizacao: new Date().toLocaleString('pt-BR') })
+                .then(() => alert("✅ Dados sincronizados com sucesso!"));
+            } catch (err) {
+                alert("Erro ao ler o arquivo Excel. Verifique se o formato está correto.");
+                console.error(err);
+            }
         };
         leitor.readAsArrayBuffer(file);
     }
 
     function resetarBancoDados() {
-        if (confirm("Limpar nuvem?")) db.ref('/').remove();
+        if (confirm("Tem certeza que deseja apagar todos os dados da nuvem?")) {
+            db.ref('/').remove().then(() => alert("Banco de dados limpo!"));
+        }
     }
 </script>
 </body>
