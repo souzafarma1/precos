@@ -140,10 +140,34 @@
         document.getElementById('relogioOnline').innerText = agora.toLocaleDateString('pt-BR') + " | " + agora.toLocaleTimeString('pt-BR');
     }, 1000);
 
+    // --- NOVO TRECHO DE SINCRONIZAÇÃO COM DIAGNÓSTICO ---
+    const statusElement = document.getElementById('statusSync');
+    
+    // Verifica se há conexão básica com o servidor do Firebase
+    db.ref('.info/connected').on('value', (snap) => {
+        if (snap.val() === false) {
+            statusElement.innerText = "🔴 Tentando conectar ao servidor...";
+            statusElement.style.color = "red";
+        }
+    });
+
+    // Tenta ler os dados e captura erros de permissão (Regras do Firebase)
     db.ref('/').on('value', (snapshot) => {
         const dados = snapshot.val() || {};
         listaProdutos = dados.produtos || [];
-        document.getElementById('statusSync').innerText = `Atualizado em: ${dados.ultima_atualizacao || '---'}`;
+        statusElement.innerText = `✅ Online | Atualizado em: ${dados.ultima_atualizacao || '---'}`;
+        statusElement.style.color = "#666";
+        
+        // Se já houver algo escrito na busca, ele atualiza a tabela na hora
+        const buscaAtual = document.getElementById('searchInput').value;
+        if(buscaAtual.length >= 2) fazerBusca(buscaAtual);
+        
+    }, (error) => {
+        // Se as Regras do Firebase estiverem bloqueadas, este aviso aparecerá
+        console.error("Erro detalhado:", error);
+        statusElement.innerText = "❌ Erro de Acesso: Verifique as REGRAS no Console do Firebase.";
+        statusElement.style.color = "red";
+        alert("Erro de permissão! Verifique se as Regras do seu banco expiraram no Firebase Console.");
     });
 
     function mudarAba(id) {
@@ -258,3 +282,4 @@
 </script>
 </body>
 </html>
+
