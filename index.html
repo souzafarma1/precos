@@ -60,7 +60,6 @@
         .info-prod { font-weight: bold; font-size: 18px; color: #111; display: block; }
         .info-lab { color: #666; font-size: 14px; font-style: italic; }
         
-        /* Estilo Dinâmico do Estoque */
         .info-estoque { font-size: 14px; font-weight: bold; display: block; margin-top: 3px; }
         .estoque-ok { color: var(--verde-estoque); }
         .estoque-zero { color: var(--vermelho); }
@@ -70,7 +69,7 @@
 
         .card-adm { background: white; padding: 35px; border-radius: 12px; text-align: center; border: 1px solid #ddd; }
         .btn-adm { padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; margin: 10px; font-size: 16px; }
-        .last-sync { font-size: 12px; color: #666; margin-bottom: 15px; text-align: center; }
+        .last-sync { font-size: 12px; color: #666; margin-bottom: 15px; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -119,7 +118,6 @@
 </div>
 
 <script>
-    // --- 1. CONFIGURAÇÃO FIREBASE ---
     const firebaseConfig = {
         apiKey: "AIzaSyCRWJLxxDIhtOV3YVjX9qYCHYhsDYhsC9M",
         authDomain: "souza-farma-f6b8f.firebaseapp.com",
@@ -140,10 +138,9 @@
         document.getElementById('relogioOnline').innerText = agora.toLocaleDateString('pt-BR') + " | " + agora.toLocaleTimeString('pt-BR');
     }, 1000);
 
-    // --- NOVO TRECHO DE SINCRONIZAÇÃO COM DIAGNÓSTICO ---
+    // --- SINCRONIZAÇÃO COM DIAGNÓSTICO ---
     const statusElement = document.getElementById('statusSync');
     
-    // Verifica se há conexão básica com o servidor do Firebase
     db.ref('.info/connected').on('value', (snap) => {
         if (snap.val() === false) {
             statusElement.innerText = "🔴 Tentando conectar ao servidor...";
@@ -151,23 +148,14 @@
         }
     });
 
-    // Tenta ler os dados e captura erros de permissão (Regras do Firebase)
     db.ref('/').on('value', (snapshot) => {
         const dados = snapshot.val() || {};
         listaProdutos = dados.produtos || [];
         statusElement.innerText = `✅ Online | Atualizado em: ${dados.ultima_atualizacao || '---'}`;
         statusElement.style.color = "#666";
-        
-        // Se já houver algo escrito na busca, ele atualiza a tabela na hora
-        const buscaAtual = document.getElementById('searchInput').value;
-        if(buscaAtual.length >= 2) fazerBusca(buscaAtual);
-        
     }, (error) => {
-        // Se as Regras do Firebase estiverem bloqueadas, este aviso aparecerá
-        console.error("Erro detalhado:", error);
         statusElement.innerText = "❌ Erro de Acesso: Verifique as REGRAS no Console do Firebase.";
         statusElement.style.color = "red";
-        alert("Erro de permissão! Verifique se as Regras do seu banco expiraram no Firebase Console.");
     });
 
     function mudarAba(id) {
@@ -197,7 +185,6 @@
 
         aviso.style.display = "none";
         corpo.innerHTML = res.slice(0, 50).map(p => {
-            // Lógica de alerta visual para estoque
             const qtd = parseInt(p.estoque) || 0;
             const classeEstoque = qtd > 0 ? "estoque-ok" : "estoque-zero";
             const textoEstoque = qtd > 0 ? `📦 Estoque: ${qtd}` : "❌ Sem Estoque / Zerado";
@@ -267,19 +254,17 @@
                 db.ref('/').set({ produtos: listaFinal, ultima_atualizacao: new Date().toLocaleString('pt-BR') })
                 .then(() => alert("✅ Dados sincronizados com sucesso!"));
             } catch (err) {
-                alert("Erro ao ler o arquivo Excel. Verifique se o formato está correto.");
-                console.error(err);
+                alert("Erro ao ler o arquivo Excel.");
             }
         };
         leitor.readAsArrayBuffer(file);
     }
 
     function resetarBancoDados() {
-        if (confirm("Tem certeza que deseja apagar todos os dados da nuvem?")) {
+        if (confirm("Tem certeza que deseja apagar todos os dados?")) {
             db.ref('/').remove().then(() => alert("Banco de dados limpo!"));
         }
     }
 </script>
 </body>
 </html>
-
