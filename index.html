@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SOUZA FARMA - Sistema de Consulta</title>
+    <title>SOUZA FARMA - Vendas e Consulta</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -12,7 +12,7 @@
     
     <style>
         :root { --vermelho: #e30613; --amarelo: #ffca05; --azul: #003399; --cinza: #f4f4f4; --verde: #28a745; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza); padding-bottom: 160px; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza); padding-bottom: 180px; }
         
         .live-clock { background: #222; color: var(--amarelo); text-align: center; padding: 8px; font-size: 14px; font-weight: bold; font-family: monospace; }
         .header { background: white; text-align: center; padding: 25px 15px; border-bottom: 6px solid var(--vermelho); }
@@ -38,22 +38,24 @@
         .lab-tag { background: white; color: var(--azul); border: 1px solid var(--azul); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; white-space: nowrap; cursor: pointer; }
         .lab-tag.active { background: var(--azul); color: white; }
 
+        /* SCANNER IPHONE 12 RESTAURADO */
         #reader { width: 100%; border-radius: 12px; overflow: hidden; border: 3px solid var(--azul); display: none; background: #000; }
-        
+        .scan-controls { display: none; background: #333; padding: 10px; border-radius: 0 0 12px 12px; text-align: center; margin-bottom: 15px; }
+        .btn-torch { background: var(--amarelo); color: #000; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; }
+
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
         td { padding: 15px; border-bottom: 1px solid #eee; }
         .info-prod { font-weight: bold; font-size: 17px; display: block; }
         .preco { color: var(--vermelho); font-weight: bold; font-size: 24px; text-align: right; }
         
-        /* CESTA E PAGAMENTO */
-        .cesta-painel { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; z-index: 1000; }
+        .cesta-painel { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; z-index: 1000; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); }
         .pagamento-opcoes { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
-        .btn-pag { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #666; background: #444; color: white; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .btn-pag { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #666; background: #444; color: white; font-size: 12px; font-weight: bold; }
         .btn-pag.selected { background: var(--amarelo); color: #000; border-color: var(--amarelo); }
-        .btn-finalizar-venda { background: var(--verde); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 10px; font-size: 16px; }
+        .btn-finalizar-venda { background: var(--verde); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 12px; font-size: 16px; }
 
         .venda-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid var(--verde); box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: #333; }
-        .cesta-detalhes { position: fixed; bottom: 150px; left: 15px; right: 15px; background: white; border-radius: 12px; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); max-height: 40vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
+        .cesta-detalhes { position: fixed; bottom: 175px; left: 15px; right: 15px; background: white; border-radius: 12px; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); max-height: 40vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
     </style>
 </head>
 <body>
@@ -79,6 +81,10 @@
 
     <div id="aba-consulta" class="tab-content active">
         <div id="reader"></div>
+        <div class="scan-controls" id="scanControls">
+            <button class="btn-torch" id="torchBtn" onclick="toggleTorch()">🔦 Ligar Lanterna</button>
+        </div>
+        
         <div class="search-area">
             <input type="text" id="searchInput" placeholder="Nome ou Código..." onkeyup="fazerBusca()">
             <button class="btn-scan" onclick="alternarCamera()">📷</button>
@@ -89,7 +95,7 @@
 
     <div id="aba-vendas" class="tab-content">
         <h3 style="text-align: center; color: var(--azul);">Vendas Pendentes</h3>
-        <div id="listaVendasPendentes">Sincronizando...</div>
+        <div id="listaVendasPendentes">Sincronizando registros...</div>
     </div>
 
     <div id="aba-cadastro" class="tab-content">
@@ -132,7 +138,7 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let listaProdutos = [], cesta = [], vendasPendentes = {}, scannerObjeto;
+    let listaProdutos = [], cesta = [], vendasPendentes = {}, scannerObjeto, isTorchOn = false;
     let labAtivo = "", pagamentoSelecionado = "";
 
     setInterval(() => { document.getElementById('relogioOnline').innerText = new Date().toLocaleString('pt-BR'); }, 1000);
@@ -155,7 +161,9 @@
     function acessoSeguro() { if(prompt("Senha:") === "souza123") mudarAba('aba-cadastro'); }
 
     function fazerBusca(t) {
-        const termo = document.getElementById('searchInput').value.toLowerCase();
+        const input = document.getElementById('searchInput');
+        if(t) input.value = t;
+        const termo = input.value.toLowerCase();
         const corpo = document.getElementById('corpoTabela');
         const containerLabs = document.getElementById('filtroLabs');
         if (termo.length < 2) { corpo.innerHTML = ""; containerLabs.innerHTML = ""; return; }
@@ -171,7 +179,9 @@
             <tr>
                 <td>
                     <span class="info-prod">${p.nome}</span>
-                    <span style="font-size:13px;color:#666;">${p.lab || '-'} | ID: ${p.id}</span><br>
+                    <span style="font-size:13px;color:#666;">${p.lab || '-'}</span><br>
+                    <span style="font-size:13px;font-weight:bold;color:${parseInt(p.estoque)>0?'var(--verde)':'var(--vermelho)'}">📦 Estoque: ${p.estoque}</span><br>
+                    <small style="color:#888">B: ${p.barras} | ID: ${p.id}</small><br>
                     <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;" onclick="addCesta('${p.nome}', '${p.preco}', '${p.id}')">➕ Adicionar</button>
                 </td>
                 <td class="preco">R$ ${p.preco}</td>
@@ -189,7 +199,8 @@
     function selecionarPagamento(tipo) {
         pagamentoSelecionado = tipo;
         document.querySelectorAll('.btn-pag').forEach(btn => btn.classList.remove('selected'));
-        document.getElementById('pag-' + tipo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "")).classList.add('selected');
+        const normalId = tipo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+        document.getElementById('pag-' + normalId).classList.add('selected');
     }
 
     function atualizarPainel() {
@@ -199,7 +210,7 @@
             const total = cesta.reduce((a, b) => a + b.valor, 0);
             document.getElementById('txtQtde').innerText = `${cesta.length} itens`;
             document.getElementById('txtTotal').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-            document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ddd;"><span>${item.nome} (ID: ${item.id})</span><button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red;border:none;background:none;font-weight:bold;">X</button></div>`).join('');
+            document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ddd;color:#333;"><span>${item.nome} (ID: ${item.id})</span><button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red;border:none;background:none;font-weight:bold;">X</button></div>`).join('');
         } else { painel.style.display = 'none'; document.getElementById('cestaDetalhes').style.display = 'none'; }
     }
 
@@ -209,8 +220,8 @@
     }
 
     function salvarVenda() {
-        if (!pagamentoSelecionado) return alert("Por favor, selecione a forma de pagamento!");
-        if (confirm(`Confirmar venda no ${pagamentoSelecionado}?`)) {
+        if (!pagamentoSelecionado) return alert("Selecione a forma de pagamento!");
+        if (confirm(`Finalizar venda no ${pagamentoSelecionado}?`)) {
             const nova = { data: new Date().toLocaleString('pt-BR'), itens: cesta, total: cesta.reduce((a, b) => a + b.valor, 0), pagamento: pagamentoSelecionado };
             db.ref('vendas').push(nova).then(() => { alert("Venda registrada!"); cesta = []; pagamentoSelecionado = ""; atualizarPainel(); });
         }
@@ -222,20 +233,35 @@
         if (chaves.length === 0) { lista.innerHTML = "Não há vendas pendentes."; return; }
         lista.innerHTML = chaves.reverse().map(id => {
             const v = vendasPendentes[id];
-            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>💰 Pagamento: <b>${v.pagamento}</b><br>${v.itens.map(i => `• ${i.nome} (ID: ${i.id})`).join('<br>')}<hr>Total: R$ ${v.total.toFixed(2).replace('.', ',')}<br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Lançado (Excluir)</button></div>`;
+            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>💰 Pagamento: <b>${v.pagamento}</b><br>${v.itens.map(i => `• ${i.nome} (ID: ${i.id})`).join('<br>')}<hr>Total: R$ ${v.total.toFixed(2).replace('.', ',')}<br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Excluir</button></div>`;
         }).join('');
     }
 
+    // --- SCANNER OTIMIZADO IPHONE 12 (RESTAURADO) ---
     function alternarCamera() {
         const r = document.getElementById('reader');
+        const ctrl = document.getElementById('scanControls');
         if (r.style.display === 'block') fecharScanner();
         else {
-            r.style.display = 'block'; scannerObjeto = new Html5Qrcode("reader");
-            scannerObjeto.start({ facingMode: "environment" }, { fps: 30, qrbox: { width: 150, height: 80 } }, txt => { fazerBusca(txt); fecharScanner(); });
+            r.style.display = 'block'; ctrl.style.display = 'block';
+            scannerObjeto = new Html5Qrcode("reader");
+            scannerObjeto.start({ facingMode: "environment" }, { 
+                fps: 30, 
+                qrbox: { width: 150, height: 80 }, // MIRA PEQUENA PARA FOCO À DISTÂNCIA
+                aspectRatio: 1.0,
+                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8 ]
+            }, txt => { fazerBusca(txt); fecharScanner(); });
         }
     }
 
-    function fecharScanner() { if (scannerObjeto) scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; }); }
+    function toggleTorch() {
+        if (!scannerObjeto) return;
+        isTorchOn = !isTorchOn;
+        scannerObjeto.applyVideoConstraints({ advanced: [{torch: isTorchOn}] })
+        .then(() => { document.getElementById('torchBtn').innerText = isTorchOn ? "🔦 Desligar Lanterna" : "🔦 Ligar Lanterna"; });
+    }
+
+    function fecharScanner() { if (scannerObjeto) scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; document.getElementById('scanControls').style.display = 'none'; isTorchOn = false; }); }
 
     function uploadExcel() {
         const file = document.getElementById('fileInput').files[0];
