@@ -2,8 +2,8 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOUZA FARMA - Sistema de Consulta</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SOUZA FARMA - Vendas e Consulta</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -11,70 +11,57 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     
     <style>
-        :root { 
-            --vermelho: #e30613; 
-            --amarelo: #ffca05; 
-            --azul: #003399; 
-            --cinza-fundo: #f4f4f4;
-            --preto-relogio: #222;
-            --verde-estoque: #28a745;
-        }
-
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza-fundo); padding-bottom: 50px; }
+        :root { --vermelho: #e30613; --amarelo: #ffca05; --azul: #003399; --cinza: #f4f4f4; --verde: #28a745; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza); padding-bottom: 120px; }
         
-        .live-clock-bar { 
-            background: var(--preto-relogio); 
-            color: var(--amarelo); 
-            text-align: center; 
-            padding: 8px; 
-            font-size: 14px; 
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
+        .live-clock { background: #222; color: var(--amarelo); text-align: center; padding: 8px; font-size: 14px; font-weight: bold; font-family: monospace; }
         .header { background: white; text-align: center; padding: 25px 15px; border-bottom: 6px solid var(--vermelho); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .logo { max-width: 200px; margin-bottom: 10px; }
-        .header h1 { color: var(--vermelho); margin: 5px 0; font-size: 30px; font-weight: 800; text-transform: uppercase; }
-        .header p { margin: 3px 0; color: #333; font-size: 14px; line-height: 1.4; }
-        .slogan { font-weight: bold; color: var(--azul); margin-top: 10px !important; font-size: 16px !important; }
+        .logo { max-width: 250px; margin-bottom: 15px; }
+        .header h1 { color: var(--vermelho); margin: 5px 0; font-size: 32px; font-weight: 800; text-transform: uppercase; }
+        .header p { margin: 3px 0; color: #333; font-size: 16px; line-height: 1.4; }
+        .slogan { font-weight: bold; color: #000; margin-top: 10px !important; font-size: 18px !important; }
 
         .container { max-width: 900px; margin: 0 auto; padding: 15px; }
 
-        .tabs { display: flex; justify-content: center; margin-bottom: 20px; gap: 10px; }
-        .tab-btn { padding: 14px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px; flex: 1; font-size: 15px; transition: 0.3s; }
-        .tab-btn.active { background: var(--vermelho); color: white; box-shadow: 0 4px 8px rgba(227, 6, 19, 0.3); }
+        .tabs { display: flex; justify-content: center; margin: 15px 0; gap: 8px; flex-wrap: wrap; }
+        .tab-btn { padding: 12px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px; flex: 1; min-width: 120px; font-size: 14px; }
+        .tab-btn.active { background: var(--vermelho); color: white; }
 
         .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.4s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .tab-content.active { display: block; }
 
-        .search-area { display: flex; gap: 10px; background: var(--amarelo); padding: 18px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .search-area input { flex: 1; padding: 15px; font-size: 20px; border-radius: 8px; border: none; outline: none; }
+        .status-sync-bar { text-align: center; font-size: 12px; margin-bottom: 15px; font-weight: bold; color: #666; }
+
+        .search-area { display: flex; gap: 10px; background: var(--amarelo); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .search-area input { flex: 1; padding: 12px; font-size: 18px; border-radius: 8px; border: none; outline: none; }
         .btn-scan { background: var(--azul); color: white; border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-size: 24px; }
 
-        #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 15px; border: 3px solid var(--azul); display: none; background: #000; }
+        /* AJUSTE DO CONTAINER DO SCANNER PARA IPHONE */
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 15px; border: 3px solid var(--azul); display: none; background: #000; position: relative; }
 
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
-        td { padding: 16px; border-bottom: 1px solid #eee; }
-        .info-prod { font-weight: bold; font-size: 18px; color: #111; display: block; }
-        .info-lab { color: #666; font-size: 14px; font-style: italic; }
+        td { padding: 15px; border-bottom: 1px solid #eee; }
         
-        .info-estoque { font-size: 14px; font-weight: bold; display: block; margin-top: 3px; }
-        .estoque-ok { color: var(--verde-estoque); }
+        .info-prod { font-weight: bold; font-size: 17px; color: #111; display: block; }
+        .info-lab { color: #666; font-size: 13px; font-style: italic; display: block; }
+        .info-estoque { font-size: 13px; font-weight: bold; display: block; margin-top: 2px; }
+        .estoque-ok { color: var(--verde); }
         .estoque-zero { color: var(--vermelho); }
+        .info-cod { font-family: 'Courier New', monospace; font-size: 12px; color: #888; margin-top: 4px; display: block; }
+        
+        .preco { color: var(--vermelho); font-weight: bold; font-size: 24px; text-align: right; }
+        .btn-add { background: var(--azul); color: white; border: none; padding: 10px 18px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; width: 100%; max-width: 150px; }
 
-        .info-cod { font-family: 'Courier New', monospace; font-size: 12px; color: #999; margin-top: 5px; display: block; }
-        .preco { color: var(--vermelho); font-weight: bold; font-size: 26px; text-align: right; }
-
-        .card-adm { background: white; padding: 35px; border-radius: 12px; text-align: center; border: 1px solid #ddd; }
-        .btn-adm { padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; margin: 10px; font-size: 16px; }
-        .last-sync { font-size: 12px; color: #666; margin-bottom: 15px; text-align: center; font-weight: bold; }
+        .cesta-painel { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; cursor: pointer; }
+        .total-valor { font-size: 24px; color: var(--amarelo); font-weight: bold; }
+        .venda-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid var(--verde); box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: #333; }
+        .btn-finalizar { background: var(--verde); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .cesta-detalhes { position: fixed; bottom: 75px; left: 10px; right: 10px; background: white; border-radius: 12px 12px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.3); max-height: 50vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
     </style>
 </head>
 <body>
 
-<div class="live-clock-bar" id="relogioOnline">CARREGANDO...</div>
+<div class="live-clock" id="relogioOnline">CARREGANDO...</div>
 
 <div class="header">
     <img src="Souza-Farma-logomarca.png" alt="Souza Farma" class="logo">
@@ -85,36 +72,43 @@
 </div>
 
 <div class="container">
-    <div id="statusSync" class="last-sync">Conectando...</div>
-    
     <div class="tabs">
-        <button id="btn-consulta" class="tab-btn active" onclick="mudarAba('aba-consulta')">🔎 CONSULTAR PREÇO</button>
-        <button id="btn-cadastro" class="tab-btn" onclick="acessoSeguroCadastro()">⚙️ CADASTRO / ADM</button>
+        <button id="btn-consulta" class="tab-btn active" onclick="mudarAba('aba-consulta')">🔎 CONSULTA</button>
+        <button id="btn-vendas" class="tab-btn" onclick="mudarAba('aba-vendas')">📝 VENDAS PENDENTES</button>
+        <button id="btn-cadastro" class="tab-btn" onclick="acessoSeguro()">⚙️ ADM</button>
     </div>
 
+    <div id="statusSync" class="status-sync-bar">Conectando ao banco de dados...</div>
+
     <div id="aba-consulta" class="tab-content active">
-        <div id="reader"></div> 
+        <div id="reader"></div>
         <div class="search-area">
-            <input type="text" id="searchInput" placeholder="Busque Nome ou Código..." onkeyup="fazerBusca()">
-            <button class="btn-scan" onclick="alternarCamera()">📷</button>
+            <input type="text" id="searchInput" placeholder="Nome ou Código..." onkeyup="fazerBusca()">
+            <button class="btn-scan" onclick="alternarCamera()" title="Scanner Otimizado">📷</button>
         </div>
-        <table>
-            <tbody id="corpoTabela"></tbody>
-        </table>
-        <div id="msgAviso" style="text-align: center; padding: 40px; color: #999;">Aguardando busca...</div>
+        <table><tbody id="corpoTabela"></tbody></table>
+    </div>
+
+    <div id="aba-vendas" class="tab-content">
+        <h3 style="color: var(--azul); text-align: center;">Vendas para Lançar no Sistema</h3>
+        <div id="listaVendasPendentes">Sincronizando registros...</div>
     </div>
 
     <div id="aba-cadastro" class="tab-content">
-        <div class="card-adm">
-            <h3>Painel Administrativo</h3>
-            <p style="font-size: 13px; color: #444;">Suporta arquivos <b>.xlsx</b> e <b>.xls</b></p>
-            <input type="file" id="fileInput" accept=".xlsx, .xls">
-            <br><br>
-            <button class="btn-adm" style="background: #28a745;" onclick="uploadExcelFirebase()">🚀 ATUALIZAR PREÇOS E ESTOQUE</button>
-            <button class="btn-adm" style="background: var(--vermelho);" onclick="resetarBancoDados()">🗑️ LIMPAR TUDO</button>
-            <div id="feedbackUpload" style="margin-top: 15px; font-weight: bold;"></div>
+        <div style="background:white; padding:20px; border-radius:10px; text-align:center; border: 1px solid #ddd;">
+            <h3>Importar Novo Excel</h3>
+            <input type="file" id="fileInput" accept=".xlsx, .xls"><br><br>
+            <button onclick="uploadExcel()" style="background:var(--verde); color:white; padding:12px 25px; border:none; border-radius:8px; font-weight:bold;">🚀 SINCRONIZAR</button>
         </div>
     </div>
+</div>
+
+<div id="cestaDetalhes" class="cesta-detalhes"></div>
+
+<div class="cesta-painel" id="painelCesta" onclick="toggleDetalhes()" style="display: none;">
+    <div><span id="txtQtde">0 itens</span><br><strong>Ver detalhes</strong></div>
+    <div class="total-valor" id="txtTotal">R$ 0,00</div>
+    <button class="btn-finalizar" onclick="salvarVenda(event)">Finalizar Venda</button>
 </div>
 
 <script>
@@ -130,72 +124,46 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let listaProdutos = [];
-    let scannerObjeto;
+    let listaProdutos = [], cesta = [], vendasPendentes = {}, scannerObjeto;
 
-    setInterval(() => {
-        const agora = new Date();
-        document.getElementById('relogioOnline').innerText = agora.toLocaleDateString('pt-BR') + " | " + agora.toLocaleTimeString('pt-BR');
-    }, 1000);
+    setInterval(() => { document.getElementById('relogioOnline').innerText = new Date().toLocaleString('pt-BR'); }, 1000);
 
-    // --- SINCRONIZAÇÃO COM DIAGNÓSTICO ---
     const statusElement = document.getElementById('statusSync');
-    
-    db.ref('.info/connected').on('value', (snap) => {
-        if (snap.val() === false) {
-            statusElement.innerText = "🔴 Tentando conectar ao servidor...";
-            statusElement.style.color = "red";
-        }
-    });
-
-    db.ref('/').on('value', (snapshot) => {
-        const dados = snapshot.val() || {};
-        listaProdutos = dados.produtos || [];
-        statusElement.innerText = `✅ Online | Atualizado em: ${dados.ultima_atualizacao || '---'}`;
+    db.ref('/').on('value', snap => {
+        const d = snap.val() || {};
+        listaProdutos = d.produtos || [];
+        vendasPendentes = d.vendas || {};
+        statusElement.innerText = `✅ Online | Atualizado em: ${d.ultima_atualizacao || '---'}`;
         statusElement.style.color = "#666";
-    }, (error) => {
-        statusElement.innerText = "❌ Erro de Acesso: Verifique as REGRAS no Console do Firebase.";
-        statusElement.style.color = "red";
+        renderizarVendas();
     });
 
-    function mudarAba(id) {
+    function mudarAba(idAba) {
         if(scannerObjeto) fecharScanner();
         document.querySelectorAll('.tab-content, .tab-btn').forEach(el => el.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        document.getElementById('btn-' + id.split('-')[1]).classList.add('active');
+        document.getElementById(idAba).classList.add('active');
+        document.getElementById('btn-' + idAba.split('-')[1]).classList.add('active');
     }
 
-    function acessoSeguroCadastro() {
-        if (prompt("Senha ADM:") === "souza123") mudarAba('aba-cadastro');
-        else alert("Acesso Negado.");
-    }
+    function acessoSeguro() { if(prompt("Senha ADM:") === "souza123") mudarAba('aba-cadastro'); }
 
     function fazerBusca(t) {
         const input = document.getElementById('searchInput');
         if(t) input.value = t;
         const termo = input.value.toLowerCase();
         const corpo = document.getElementById('corpoTabela');
-        const aviso = document.getElementById('msgAviso');
-
-        if (termo.length < 2) { corpo.innerHTML = ""; aviso.style.display = "block"; return; }
-
-        const res = listaProdutos.filter(p => 
-            String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo)
-        );
-
-        aviso.style.display = "none";
-        corpo.innerHTML = res.slice(0, 50).map(p => {
+        if (termo.length < 2) { corpo.innerHTML = ""; return; }
+        const res = listaProdutos.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
+        corpo.innerHTML = res.slice(0, 30).map(p => {
             const qtd = parseInt(p.estoque) || 0;
-            const classeEstoque = qtd > 0 ? "estoque-ok" : "estoque-zero";
-            const textoEstoque = qtd > 0 ? `📦 Estoque: ${qtd}` : "❌ Sem Estoque / Zerado";
-
             return `
                 <tr>
                     <td>
                         <span class="info-prod">${p.nome}</span>
                         <span class="info-lab">${p.lab || '-'}</span>
-                        <span class="info-estoque ${classeEstoque}">${textoEstoque}</span>
-                        <span class="info-cod">B: ${p.barras} | ID: ${p.id}</span>
+                        <span class="info-estoque ${qtd > 0 ? 'estoque-ok' : 'estoque-zero'}">📦 Estoque: ${qtd}</span>
+                        <span class="info-cod">B: ${p.barras || '-'} | ID: ${p.id || '-'}</span>
+                        <button class="btn-add" onclick="addCesta('${p.nome}', '${p.preco}', '${p.id}')">➕ Adicionar</button>
                     </td>
                     <td class="preco">R$ ${p.preco}</td>
                 </tr>
@@ -203,67 +171,99 @@
         }).join('');
     }
 
+    function addCesta(nome, preco, id) {
+        cesta.push({ nome, valor: parseFloat(preco.replace(',', '.')), id });
+        atualizarPainel();
+    }
+
+    function atualizarPainel() {
+        const painel = document.getElementById('painelCesta');
+        if (cesta.length > 0) {
+            painel.style.display = 'flex';
+            const total = cesta.reduce((a, b) => a + b.valor, 0);
+            document.getElementById('txtQtde').innerText = `${cesta.length} item(ns)`;
+            document.getElementById('txtTotal').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `
+                <div style="display:flex; justify-content:space-between; padding:15px; border-bottom:1px solid #ddd; color:#333; align-items:center;">
+                    <span><b>${item.nome}</b><br><small>ID: ${item.id}</small></span>
+                    <button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red; border:none; background:none; font-weight:bold; font-size:18px; padding:10px;">✕</button>
+                </div>
+            `).join('');
+        } else { painel.style.display = 'none'; document.getElementById('cestaDetalhes').style.display = 'none'; }
+    }
+
+    function toggleDetalhes() {
+        const d = document.getElementById('cestaDetalhes');
+        d.style.display = d.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function salvarVenda(e) {
+        e.stopPropagation();
+        if(confirm("Confirmar fechamento deste orçamento?")) {
+            const novaVenda = { data: new Date().toLocaleString('pt-BR'), itens: cesta, total: cesta.reduce((a, b) => a + b.valor, 0) };
+            db.ref('vendas').push(novaVenda).then(() => { alert("Venda registrada com sucesso!"); cesta = []; atualizarPainel(); });
+        }
+    }
+
+    function renderizarVendas() {
+        const lista = document.getElementById('listaVendasPendentes');
+        const chaves = Object.keys(vendasPendentes);
+        if (chaves.length === 0) { lista.innerHTML = "<p style='text-align:center; padding:20px; color:#888;'>Nenhuma venda pendente.</p>"; return; }
+        lista.innerHTML = chaves.reverse().map(id => {
+            const v = vendasPendentes[id];
+            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>${v.itens.map(i => `• ${i.nome} (<b>ID: ${i.id}</b>)`).join('<br>')}<hr><strong>Total: R$ ${v.total.toFixed(2).replace('.', ',')}</strong><br><br><button onclick="excluirVenda('${id}')" style="background:var(--vermelho); color:white; border:none; padding:10px; border-radius:5px; cursor:pointer; width:100%; font-weight:bold;">Lançado no Sistema (Excluir)</button></div>`;
+        }).join('');
+    }
+
+    function excluirVenda(id) { if(confirm("Confirmar exclusão? Este item deve estar registrado no sistema oficial.")) db.ref('vendas/' + id).remove(); }
+
+    // --- SCANNER OTIMIZADO PARA IPHONE 12 ---
     function alternarCamera() {
         const r = document.getElementById('reader');
         if (r.style.display === 'block') fecharScanner();
         else {
             r.style.display = 'block';
             scannerObjeto = new Html5Qrcode("reader");
-            scannerObjeto.start({ facingMode: "environment" }, { fps: 20, qrbox: { width: 300, height: 180 }, aspectRatio: 1.0 }, (txt) => {
-                fazerBusca(txt);
-                fecharScanner();
-            }).catch(e => console.error(e));
+            
+            // Configurações específicas para melhor foco e performance em iPhones
+            const config = { 
+                fps: 25, // Mais frames para captura rápida
+                qrbox: { width: 280, height: 160 }, // Área retangular focada para códigos de barras
+                aspectRatio: 1.0,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true // Tenta usar detecção nativa do sistema se disponível
+                }
+            };
+            
+            scannerObjeto.start(
+                { facingMode: "environment" }, 
+                config, 
+                txt => { 
+                    fazerBusca(txt); 
+                    fecharScanner(); 
+                    // Feedback tátil no iPhone
+                    if(navigator.vibrate) navigator.vibrate(100); 
+                }
+            ).catch(e => alert("Permissão de câmera negada ou erro ao iniciar."));
         }
     }
 
-    function fecharScanner() {
-        if (scannerObjeto) scannerObjeto.stop().then(() => document.getElementById('reader').style.display = 'none');
-    }
+    function fecharScanner() { if (scannerObjeto) { scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; }); } }
 
-    function uploadExcelFirebase() {
+    function uploadExcel() {
         const file = document.getElementById('fileInput').files[0];
-        if (!file) return alert("Selecione o arquivo!");
-
+        if(!file) return alert("Selecione o arquivo Excel!");
         const leitor = new FileReader();
         leitor.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const wb = XLSX.read(data, {type: 'array'});
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const json = XLSX.utils.sheet_to_json(ws);
-
-                const listaFinal = json.map(item => {
-                    const getV = (n) => {
-                        const k = Object.keys(item).find(x => n.includes(x.toLowerCase().trim()));
-                        return k ? item[k] : "";
-                    };
-
-                    let pBruto = String(getV(['preco', 'valor', 'venda', 'preço'])).replace('R$', '').trim();
-                    if (!pBruto.includes(',') && !pBruto.includes('.')) pBruto += ",00";
-
-                    return {
-                        nome: getV(['nome', 'produto', 'descricao']),
-                        lab: getV(['laboratorio', 'lab', 'fabricante']),
-                        barras: getV(['codigo_barras', 'barras', 'ean']),
-                        id: getV(['codigo_interno', 'id', 'codigo']),
-                        preco: pBruto,
-                        estoque: getV(['estoque', 'qtd', 'quantidade', 'disponivel']) || "0"
-                    };
-                });
-
-                db.ref('/').set({ produtos: listaFinal, ultima_atualizacao: new Date().toLocaleString('pt-BR') })
-                .then(() => alert("✅ Dados sincronizados com sucesso!"));
-            } catch (err) {
-                alert("Erro ao ler o arquivo Excel.");
-            }
+            const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            const lista = json.map(item => {
+                const g = n => { const k = Object.keys(item).find(x => n.includes(x.toLowerCase().trim())); return k ? item[k] : ""; };
+                return { nome: g(['nome','produto']), lab: g(['lab','laboratorio']), barras: g(['barras','ean']), id: g(['id','codigo_interno']), preco: String(g(['preco','valor'])).replace('R$','').trim(), estoque: g(['estoque','qtd']) || "0" };
+            });
+            db.ref('produtos').set(lista).then(() => { db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); alert("✅ Banco Atualizado!"); });
         };
         leitor.readAsArrayBuffer(file);
-    }
-
-    function resetarBancoDados() {
-        if (confirm("Tem certeza que deseja apagar todos os dados?")) {
-            db.ref('/').remove().then(() => alert("Banco de dados limpo!"));
-        }
     }
 </script>
 </body>
