@@ -15,7 +15,8 @@
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza); padding-bottom: 120px; }
         
         .live-clock { background: #222; color: var(--amarelo); text-align: center; padding: 8px; font-size: 14px; font-weight: bold; font-family: monospace; }
-        .header { background: white; text-align: center; padding: 25px 15px; border-bottom: 6px solid var(--vermelho); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        .header { background: white; text-align: center; padding: 25px 15px; border-bottom: 6px solid var(--vermelho); }
         .logo { max-width: 250px; margin-bottom: 15px; }
         .header h1 { color: var(--vermelho); margin: 5px 0; font-size: 32px; font-weight: 800; text-transform: uppercase; }
         .header p { margin: 3px 0; color: #333; font-size: 16px; line-height: 1.4; }
@@ -44,7 +45,7 @@
         .cesta-painel { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; cursor: pointer; }
         .total-valor { font-size: 24px; color: var(--amarelo); font-weight: bold; }
         .btn-finalizar { background: var(--verde); color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        .cesta-detalhes { position: fixed; bottom: 70px; left: 15px; right: 15px; background: white; border-radius: 10px 10px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); max-height: 40vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
+        .cesta-detalhes { position: fixed; bottom: 70px; left: 15px; right: 15px; background: white; border-radius: 12px; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); max-height: 40vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
     </style>
 </head>
 <body>
@@ -78,7 +79,7 @@
     </div>
 
     <div id="aba-vendas" class="tab-content">
-        <h3 style="color: var(--azul);">Vendas Realizadas (Aguardando Registro)</h3>
+        <h3 style="color: var(--azul); text-align: center;">Vendas Pendentes (Lançar no Sistema)</h3>
         <div id="listaVendasPendentes">Sincronizando...</div>
     </div>
 
@@ -86,7 +87,7 @@
         <div style="background:white; padding:20px; border-radius:10px; text-align:center; border: 1px solid #ddd;">
             <h3>Sincronizar Banco de Dados</h3>
             <input type="file" id="fileInput" accept=".xlsx, .xls"><br><br>
-            <button onclick="uploadExcel()" style="background:var(--verde); color:white; padding:12px; border:none; border-radius:5px; font-weight:bold;">🚀 SINCRONIZAR</button>
+            <button onclick="uploadExcel()" style="background:var(--verde); color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;">🚀 SINCRONIZAR</button>
         </div>
     </div>
 </div>
@@ -193,14 +194,14 @@
     function renderizarVendas() {
         const lista = document.getElementById('listaVendasPendentes');
         const chaves = Object.keys(vendasPendentes);
-        if (chaves.length === 0) { lista.innerHTML = "Não há vendas pendentes."; return; }
-        lista.innerHTML = chaves.map(id => {
+        if (chaves.length === 0) { lista.innerHTML = "<p style='text-align:center;'>Nenhuma venda pendente.</p>"; return; }
+        lista.innerHTML = chaves.reverse().map(id => {
             const v = vendasPendentes[id];
             return `<div style="background:white;padding:15px;margin-bottom:15px;border-radius:10px;border-left:5px solid var(--verde);box-shadow:0 2px 5px rgba(0,0,0,0.1);">📅 ${v.data}<br>${v.itens.map(i => `• ${i.nome} (ID: ${i.id})`).join('<br>')}<hr>Total: R$ ${v.total.toFixed(2).replace('.', ',')}<br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;cursor:pointer;width:100%;margin-top:10px;">Excluir</button></div>`;
         }).join('');
     }
 
-    // --- SCANNER OTIMIZADO PARA IPHONE 12 (ALTA DEFINIÇÃO CENTRALIZADA) ---
+    // --- SCANNER COM REQUADRO REDUZIDO PARA IPHONE (FOCO À DISTÂNCIA) ---
     function alternarCamera() {
         const r = document.getElementById('reader');
         if (r.style.display === 'block') fecharScanner();
@@ -208,10 +209,9 @@
             r.style.display = 'block';
             scannerObjeto = new Html5Qrcode("reader");
             
-            // Força a câmera traseira com foco contínuo e resolução Full HD se disponível
             const config = { 
-                fps: 30, 
-                qrbox: { width: 250, height: 150 }, // Retângulo menor obriga o atendente a afastar um pouco o celular, mantendo o foco
+                fps: 25, 
+                qrbox: { width: 220, height: 130 }, // Caixa menor força você a afastar o celular
                 aspectRatio: 1.0
             };
             
