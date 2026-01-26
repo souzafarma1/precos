@@ -12,13 +12,13 @@
     
     <style>
         :root { --vermelho: #e30613; --amarelo: #ffca05; --azul: #003399; --cinza: #f4f4f4; --verde: #28a745; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza); padding-bottom: 120px; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--cinza); padding-bottom: 160px; }
         
         .live-clock { background: #222; color: var(--amarelo); text-align: center; padding: 8px; font-size: 14px; font-weight: bold; font-family: monospace; }
         .header { background: white; text-align: center; padding: 25px 15px; border-bottom: 6px solid var(--vermelho); }
         .logo { max-width: 250px; margin-bottom: 15px; }
         .header h1 { color: var(--vermelho); margin: 5px 0; font-size: 32px; font-weight: 800; text-transform: uppercase; }
-        .header p { margin: 3px 0; color: #333; font-size: 16px; }
+        .header p { margin: 3px 0; color: #333; font-size: 16px; line-height: 1.4; }
         .slogan { font-weight: bold; color: #000; margin-top: 10px !important; font-size: 18px !important; }
 
         .container { max-width: 900px; margin: 0 auto; padding: 15px; }
@@ -34,21 +34,26 @@
         .search-area input { flex: 1; padding: 12px; font-size: 18px; border-radius: 8px; border: none; outline: none; }
         .btn-scan { background: var(--azul); color: white; border: none; padding: 0 15px; border-radius: 8px; cursor: pointer; font-size: 20px; }
 
-        /* Estilo dos Filtros de Laboratório */
-        #filtroLabs { display: flex; gap: 8px; overflow-x: auto; padding: 5px 0 15px 0; scrollbar-width: none; }
-        #filtroLabs::-webkit-scrollbar { display: none; }
+        #filtroLabs { display: flex; gap: 8px; overflow-x: auto; padding: 5px 0 15px 0; }
         .lab-tag { background: white; color: var(--azul); border: 1px solid var(--azul); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; white-space: nowrap; cursor: pointer; }
         .lab-tag.active { background: var(--azul); color: white; }
 
-        #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 10px; border: 3px solid var(--azul); display: none; background: #000; }
-        .scan-controls { display: none; background: #333; padding: 10px; border-radius: 0 0 12px 12px; text-align: center; margin-bottom: 15px; }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; border: 3px solid var(--azul); display: none; background: #000; }
         
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
         td { padding: 15px; border-bottom: 1px solid #eee; }
         .info-prod { font-weight: bold; font-size: 17px; display: block; }
         .preco { color: var(--vermelho); font-weight: bold; font-size: 24px; text-align: right; }
         
-        .cesta-painel { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; cursor: pointer; }
+        /* CESTA E PAGAMENTO */
+        .cesta-painel { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; z-index: 1000; }
+        .pagamento-opcoes { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+        .btn-pag { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #666; background: #444; color: white; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .btn-pag.selected { background: var(--amarelo); color: #000; border-color: var(--amarelo); }
+        .btn-finalizar-venda { background: var(--verde); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 10px; font-size: 16px; }
+
+        .venda-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid var(--verde); box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: #333; }
+        .cesta-detalhes { position: fixed; bottom: 150px; left: 15px; right: 15px; background: white; border-radius: 12px; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); max-height: 40vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
     </style>
 </head>
 <body>
@@ -74,23 +79,17 @@
 
     <div id="aba-consulta" class="tab-content active">
         <div id="reader"></div>
-        <div class="scan-controls" id="scanControls">
-            <button onclick="toggleTorch()" style="background:var(--amarelo); border:none; padding:8px 15px; border-radius:5px; font-weight:bold;">🔦 Lanterna</button>
-        </div>
-        
         <div class="search-area">
             <input type="text" id="searchInput" placeholder="Nome ou Código..." onkeyup="fazerBusca()">
             <button class="btn-scan" onclick="alternarCamera()">📷</button>
         </div>
-
         <div id="filtroLabs"></div>
-
         <table><tbody id="corpoTabela"></tbody></table>
     </div>
 
     <div id="aba-vendas" class="tab-content">
         <h3 style="text-align: center; color: var(--azul);">Vendas Pendentes</h3>
-        <div id="listaVendasPendentes"></div>
+        <div id="listaVendasPendentes">Sincronizando...</div>
     </div>
 
     <div id="aba-cadastro" class="tab-content">
@@ -102,11 +101,22 @@
     </div>
 </div>
 
-<div id="cestaDetalhes" style="position:fixed; bottom:70px; left:15px; right:15px; background:white; border-radius:12px; box-shadow:0 -5px 15px rgba(0,0,0,0.2); max-height:40vh; overflow-y:auto; display:none; z-index:999; border:2px solid var(--azul);"></div>
-<div class="cesta-painel" id="painelCesta" onclick="toggleDetalhes()" style="display: none;">
-    <div><span id="txtQtde">0 itens</span><br><strong>Ver detalhes</strong></div>
-    <div style="font-size:24px; color:var(--amarelo); font-weight:bold;" id="txtTotal">R$ 0,00</div>
-    <button style="background:var(--verde);color:white;border:none;padding:10px;border-radius:5px;font-weight:bold;" onclick="salvarVenda(event)">Finalizar</button>
+<div id="cestaDetalhes" class="cesta-detalhes"></div>
+
+<div class="cesta-painel" id="painelCesta" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center;" onclick="toggleDetalhes()">
+        <div><span id="txtQtde">0 itens</span><br><strong>Ver detalhes</strong></div>
+        <div style="font-size:24px; color:var(--amarelo); font-weight:bold;" id="txtTotal">R$ 0,00</div>
+    </div>
+    
+    <div class="pagamento-opcoes">
+        <button class="btn-pag" id="pag-dinheiro" onclick="selecionarPagamento('Dinheiro')">Dinheiro</button>
+        <button class="btn-pag" id="pag-pix" onclick="selecionarPagamento('PIX')">PIX</button>
+        <button class="btn-pag" id="pag-debito" onclick="selecionarPagamento('Débito')">Débito</button>
+        <button class="btn-pag" id="pag-credito" onclick="selecionarPagamento('Crédito')">Crédito</button>
+    </div>
+    
+    <button class="btn-finalizar-venda" onclick="salvarVenda()">Finalizar Venda</button>
 </div>
 
 <script>
@@ -122,8 +132,8 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let listaProdutos = [], cesta = [], vendasPendentes = {}, scannerObjeto, isTorchOn = false;
-    let labAtivo = "";
+    let listaProdutos = [], cesta = [], vendasPendentes = {}, scannerObjeto;
+    let labAtivo = "", pagamentoSelecionado = "";
 
     setInterval(() => { document.getElementById('relogioOnline').innerText = new Date().toLocaleString('pt-BR'); }, 1000);
 
@@ -144,43 +154,24 @@
 
     function acessoSeguro() { if(prompt("Senha:") === "souza123") mudarAba('aba-cadastro'); }
 
-    function fazerBusca(t, filtroLab = "") {
-        const input = document.getElementById('searchInput');
-        if(t) input.value = t;
-        const termo = input.value.toLowerCase();
+    function fazerBusca(t) {
+        const termo = document.getElementById('searchInput').value.toLowerCase();
         const corpo = document.getElementById('corpoTabela');
         const containerLabs = document.getElementById('filtroLabs');
-
         if (termo.length < 2) { corpo.innerHTML = ""; containerLabs.innerHTML = ""; return; }
 
-        let filtrados = listaProdutos.filter(p => 
-            String(p.nome).toLowerCase().includes(termo) || 
-            String(p.barras).includes(termo) || 
-            String(p.id).toLowerCase().includes(termo)
-        );
-
-        // Gerar botões de laboratório baseados na busca
-        const labsEncontrados = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
+        let filtrados = listaProdutos.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
+        const labs = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
         
-        if (labsEncontrados.length > 1) {
-            containerLabs.innerHTML = `<div class="lab-tag ${labAtivo === "" ? "active" : ""}" onclick="setLab('')">TODOS</div>` + 
-                labsEncontrados.map(l => `<div class="lab-tag ${labAtivo === l ? "active" : ""}" onclick="setLab('${l}')">${l}</div>`).join('');
-        } else {
-            containerLabs.innerHTML = "";
-        }
+        containerLabs.innerHTML = labs.length > 1 ? `<div class="lab-tag ${labAtivo === "" ? "active" : ""}" onclick="setLab('')">TODOS</div>` + labs.map(l => `<div class="lab-tag ${labAtivo === l ? "active" : ""}" onclick="setLab('${l}')">${l}</div>`).join('') : "";
 
-        // Aplicar filtro de laboratório se selecionado
-        if (labAtivo !== "") {
-            filtrados = filtrados.filter(p => p.lab === labAtivo);
-        }
+        if (labAtivo !== "") filtrados = filtrados.filter(p => p.lab === labAtivo);
 
         corpo.innerHTML = filtrados.slice(0, 30).map(p => `
             <tr>
                 <td>
                     <span class="info-prod">${p.nome}</span>
-                    <span style="font-size:13px;color:#666;">${p.lab || '-'}</span><br>
-                    <span style="font-size:13px;font-weight:bold;color:${parseInt(p.estoque)>0?'var(--verde)':'var(--vermelho)'}">📦 Estoque: ${p.estoque}</span><br>
-                    <small style="color:#888">ID: ${p.id}</small><br>
+                    <span style="font-size:13px;color:#666;">${p.lab || '-'} | ID: ${p.id}</span><br>
                     <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;" onclick="addCesta('${p.nome}', '${p.preco}', '${p.id}')">➕ Adicionar</button>
                 </td>
                 <td class="preco">R$ ${p.preco}</td>
@@ -188,29 +179,27 @@
         `).join('');
     }
 
-    function setLab(lab) {
-        labAtivo = lab;
-        fazerBusca();
-    }
+    function setLab(l) { labAtivo = l; fazerBusca(); }
 
     function addCesta(nome, preco, id) {
         cesta.push({ nome, valor: parseFloat(preco.replace(',', '.')), id });
         atualizarPainel();
     }
 
+    function selecionarPagamento(tipo) {
+        pagamentoSelecionado = tipo;
+        document.querySelectorAll('.btn-pag').forEach(btn => btn.classList.remove('selected'));
+        document.getElementById('pag-' + tipo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "")).classList.add('selected');
+    }
+
     function atualizarPainel() {
         const painel = document.getElementById('painelCesta');
         if (cesta.length > 0) {
-            painel.style.display = 'flex';
+            painel.style.display = 'block';
             const total = cesta.reduce((a, b) => a + b.valor, 0);
             document.getElementById('txtQtde').innerText = `${cesta.length} itens`;
             document.getElementById('txtTotal').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-            document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `
-                <div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ddd;color:#333;">
-                    <span>${item.nome} (ID: ${item.id})</span>
-                    <button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red;border:none;background:none;font-weight:bold;">X</button>
-                </div>
-            `).join('');
+            document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ddd;"><span>${item.nome} (ID: ${item.id})</span><button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red;border:none;background:none;font-weight:bold;">X</button></div>`).join('');
         } else { painel.style.display = 'none'; document.getElementById('cestaDetalhes').style.display = 'none'; }
     }
 
@@ -219,11 +208,11 @@
         d.style.display = d.style.display === 'block' ? 'none' : 'block';
     }
 
-    function salvarVenda(e) {
-        e.stopPropagation();
-        if(confirm("Deseja finalizar esta venda?")) {
-            const nova = { data: new Date().toLocaleString('pt-BR'), itens: cesta, total: cesta.reduce((a, b) => a + b.valor, 0) };
-            db.ref('vendas').push(nova).then(() => { alert("Venda salva!"); cesta = []; atualizarPainel(); });
+    function salvarVenda() {
+        if (!pagamentoSelecionado) return alert("Por favor, selecione a forma de pagamento!");
+        if (confirm(`Confirmar venda no ${pagamentoSelecionado}?`)) {
+            const nova = { data: new Date().toLocaleString('pt-BR'), itens: cesta, total: cesta.reduce((a, b) => a + b.valor, 0), pagamento: pagamentoSelecionado };
+            db.ref('vendas').push(nova).then(() => { alert("Venda registrada!"); cesta = []; pagamentoSelecionado = ""; atualizarPainel(); });
         }
     }
 
@@ -233,27 +222,20 @@
         if (chaves.length === 0) { lista.innerHTML = "Não há vendas pendentes."; return; }
         lista.innerHTML = chaves.reverse().map(id => {
             const v = vendasPendentes[id];
-            return `<div style="background:white;padding:15px;margin-bottom:10px;border-radius:10px;border-left:5px solid var(--verde);box-shadow:0 2px 5px rgba(0,0,0,0.1);">📅 ${v.data}<br>${v.itens.map(i => `• ${i.nome} (ID: ${i.id})`).join('<br>')}<hr>Total: R$ ${v.total.toFixed(2).replace('.', ',')}<br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Excluir</button></div>`;
+            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>💰 Pagamento: <b>${v.pagamento}</b><br>${v.itens.map(i => `• ${i.nome} (ID: ${i.id})`).join('<br>')}<hr>Total: R$ ${v.total.toFixed(2).replace('.', ',')}<br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Lançado (Excluir)</button></div>`;
         }).join('');
     }
 
     function alternarCamera() {
         const r = document.getElementById('reader');
-        const ctrl = document.getElementById('scanControls');
         if (r.style.display === 'block') fecharScanner();
         else {
-            r.style.display = 'block'; ctrl.style.display = 'block';
-            scannerObjeto = new Html5Qrcode("reader");
+            r.style.display = 'block'; scannerObjeto = new Html5Qrcode("reader");
             scannerObjeto.start({ facingMode: "environment" }, { fps: 30, qrbox: { width: 150, height: 80 } }, txt => { fazerBusca(txt); fecharScanner(); });
         }
     }
 
-    function toggleTorch() {
-        isTorchOn = !isTorchOn;
-        scannerObjeto.applyVideoConstraints({ advanced: [{torch: isTorchOn}] });
-    }
-
-    function fecharScanner() { if (scannerObjeto) scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; document.getElementById('scanControls').style.display = 'none'; }); }
+    function fecharScanner() { if (scannerObjeto) scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; }); }
 
     function uploadExcel() {
         const file = document.getElementById('fileInput').files[0];
