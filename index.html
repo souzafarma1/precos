@@ -36,6 +36,7 @@
         .search-area input { flex: 1; padding: 12px; font-size: 18px; border-radius: 8px; border: none; outline: none; }
         .btn-scan { background: var(--azul); color: white; border: none; padding: 0 15px; border-radius: 8px; cursor: pointer; font-size: 20px; }
 
+        /* Ajuste Visual do Scanner */
         #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 15px; border: 3px solid var(--azul); display: none; background: #000; }
 
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
@@ -79,7 +80,7 @@
     </div>
 
     <div id="aba-vendas" class="tab-content">
-        <h3 style="color: var(--azul); text-align: center;">Vendas Pendentes (Lançar no Sistema)</h3>
+        <h3 style="color: var(--azul); text-align: center;">Vendas Pendentes (Registrar no Sistema)</h3>
         <div id="listaVendasPendentes">Sincronizando...</div>
     </div>
 
@@ -87,7 +88,7 @@
         <div style="background:white; padding:20px; border-radius:10px; text-align:center; border: 1px solid #ddd;">
             <h3>Sincronizar Banco de Dados</h3>
             <input type="file" id="fileInput" accept=".xlsx, .xls"><br><br>
-            <button onclick="uploadExcel()" style="background:var(--verde); color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;">🚀 SINCRONIZAR</button>
+            <button onclick="uploadExcel()" style="background:var(--verde); color:white; padding:12px; border:none; border-radius:5px; font-weight:bold;">🚀 SINCRONIZAR</button>
         </div>
     </div>
 </div>
@@ -143,18 +144,21 @@
         const corpo = document.getElementById('corpoTabela');
         if (termo.length < 2) { corpo.innerHTML = ""; return; }
         const res = listaProdutos.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
-        corpo.innerHTML = res.slice(0, 30).map(p => `
-            <tr>
-                <td>
-                    <span class="info-prod">${p.nome}</span>
-                    <span style="font-size:13px;color:#666;">${p.lab || '-'}</span><br>
-                    <span style="font-size:13px;font-weight:bold;color:${parseInt(p.estoque)>0?'var(--verde)':'var(--vermelho)'}">📦 Estoque: ${p.estoque}</span><br>
-                    <small style="color:#888">B: ${p.barras} | ID: ${p.id}</small><br>
-                    <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;font-weight:bold;" onclick="addCesta('${p.nome}', '${p.preco}', '${p.id}')">➕ Adicionar</button>
-                </td>
-                <td class="preco">R$ ${p.preco}</td>
-            </tr>
-        `).join('');
+        corpo.innerHTML = res.slice(0, 30).map(p => {
+            const qtd = parseInt(p.estoque) || 0;
+            return `
+                <tr>
+                    <td>
+                        <span class="info-prod">${p.nome}</span>
+                        <span style="font-size:13px;color:#666;">${p.lab || '-'}</span><br>
+                        <span style="font-size:13px;font-weight:bold;color:${parseInt(p.estoque)>0?'var(--verde)':'var(--vermelho)'}">📦 Estoque: ${p.estoque}</span><br>
+                        <small style="color:#888">B: ${p.barras} | ID: ${p.id}</small><br>
+                        <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;font-weight:bold;" onclick="addCesta('${p.nome}', '${p.preco}', '${p.id}')">➕ Adicionar</button>
+                    </td>
+                    <td class="preco">R$ ${p.preco}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     function addCesta(nome, preco, id) {
@@ -201,7 +205,7 @@
         }).join('');
     }
 
-    // --- SCANNER COM REQUADRO REDUZIDO PARA IPHONE (FOCO À DISTÂNCIA) ---
+    // --- SCANNER COM ÁREA DE LEITURA PEQUENA PARA IPHONE 12 ---
     function alternarCamera() {
         const r = document.getElementById('reader');
         if (r.style.display === 'block') fecharScanner();
@@ -210,8 +214,10 @@
             scannerObjeto = new Html5Qrcode("reader");
             
             const config = { 
-                fps: 25, 
-                qrbox: { width: 220, height: 130 }, // Caixa menor força você a afastar o celular
+                fps: 30, 
+                // Retângulo pequeno força o usuário a afastar o celular
+                // permitindo que o iPhone 12 mantenha o foco
+                qrbox: { width: 180, height: 100 }, 
                 aspectRatio: 1.0
             };
             
