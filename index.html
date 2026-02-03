@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SOUZA FARMA - Vendas e Consulta</title>
+    <title>SOUZA FARMA - Sistema de Vendas</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -34,19 +34,18 @@
         .search-area input { flex: 1; padding: 12px; font-size: 18px; border-radius: 8px; border: none; outline: none; }
         .btn-scan { background: var(--azul); color: white; border: none; padding: 0 15px; border-radius: 8px; cursor: pointer; font-size: 20px; }
 
-        #filtroLabs { display: flex; gap: 8px; overflow-x: auto; padding: 5px 0 15px 0; }
+        #filtroLabs { display: flex; gap: 8px; overflow-x: auto; padding: 5px 0 15px 0; scrollbar-width: none; }
+        #filtroLabs::-webkit-scrollbar { display: none; }
         .lab-tag { background: white; color: var(--azul); border: 1px solid var(--azul); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; white-space: nowrap; cursor: pointer; }
         .lab-tag.active { background: var(--azul); color: white; }
 
-        /* SCANNER IPHONE 12 RESTAURADO */
         #reader { width: 100%; border-radius: 12px; overflow: hidden; border: 3px solid var(--azul); display: none; background: #000; }
         .scan-controls { display: none; background: #333; padding: 10px; border-radius: 0 0 12px 12px; text-align: center; margin-bottom: 15px; }
-        .btn-torch { background: var(--amarelo); color: #000; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; }
-
+        
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
         td { padding: 15px; border-bottom: 1px solid #eee; }
         .info-prod { font-weight: bold; font-size: 17px; display: block; }
-        .preco { color: var(--vermelho); font-weight: bold; font-size: 24px; text-align: right; }
+        .preco { color: var(--vermelho); font-weight: bold; font-size: 24px; text-align: right; white-space: nowrap; }
         
         .cesta-painel { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 15px; z-index: 1000; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); }
         .pagamento-opcoes { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
@@ -77,12 +76,12 @@
         <button id="btn-cadastro" class="tab-btn" onclick="acessoSeguro()">⚙️ ADM</button>
     </div>
 
-    <div id="statusSync" class="status-sync-bar">Conectando...</div>
+    <div id="statusSync" class="status-sync-bar">Conectando ao banco...</div>
 
     <div id="aba-consulta" class="tab-content active">
         <div id="reader"></div>
         <div class="scan-controls" id="scanControls">
-            <button class="btn-torch" id="torchBtn" onclick="toggleTorch()">🔦 Ligar Lanterna</button>
+            <button onclick="toggleTorch()" style="background:var(--amarelo); border:none; padding:8px 15px; border-radius:5px; font-weight:bold;">🔦 Ligar Lanterna</button>
         </div>
         
         <div class="search-area">
@@ -169,30 +168,38 @@
         if (termo.length < 2) { corpo.innerHTML = ""; containerLabs.innerHTML = ""; return; }
 
         let filtrados = listaProdutos.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
-        const labs = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
         
+        const labs = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
         containerLabs.innerHTML = labs.length > 1 ? `<div class="lab-tag ${labAtivo === "" ? "active" : ""}" onclick="setLab('')">TODOS</div>` + labs.map(l => `<div class="lab-tag ${labAtivo === l ? "active" : ""}" onclick="setLab('${l}')">${l}</div>`).join('') : "";
 
         if (labAtivo !== "") filtrados = filtrados.filter(p => p.lab === labAtivo);
 
-        corpo.innerHTML = filtrados.slice(0, 30).map(p => `
-            <tr>
-                <td>
-                    <span class="info-prod">${p.nome}</span>
-                    <span style="font-size:13px;color:#666;">${p.lab || '-'}</span><br>
-                    <span style="font-size:13px;font-weight:bold;color:${parseInt(p.estoque)>0?'var(--verde)':'var(--vermelho)'}">📦 Estoque: ${p.estoque}</span><br>
-                    <small style="color:#888">B: ${p.barras} | ID: ${p.id}</small><br>
-                    <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;" onclick="addCesta('${p.nome}', '${p.preco}', '${p.id}')">➕ Adicionar</button>
-                </td>
-                <td class="preco">R$ ${p.preco}</td>
-            </tr>
-        `).join('');
+        corpo.innerHTML = filtrados.slice(0, 30).map(p => {
+            // CORREÇÃO DE PREÇO: Garante 2 casas decimais
+            let pBruto = String(p.preco).replace(',', '.');
+            let precoNum = parseFloat(pBruto);
+            let precoFormatado = isNaN(precoNum) ? "0,00" : precoNum.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            return `
+                <tr>
+                    <td>
+                        <span class="info-prod">${p.nome}</span>
+                        <span style="font-size:13px;color:#666;">${p.lab || '-'}</span><br>
+                        <span style="font-size:13px;font-weight:bold;color:${parseInt(p.estoque)>0?'var(--verde)':'var(--vermelho)'}">📦 Estoque: ${p.estoque}</span><br>
+                        <small style="color:#888">B: ${p.barras || '---'} | ID: ${p.id}</small><br>
+                        <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;" onclick="addCesta('${p.nome}', '${precoFormatado}', '${p.id}')">➕ Adicionar</button>
+                    </td>
+                    <td class="preco">R$ ${precoFormatado}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     function setLab(l) { labAtivo = l; fazerBusca(); }
 
     function addCesta(nome, preco, id) {
-        cesta.push({ nome, valor: parseFloat(preco.replace(',', '.')), id });
+        let valorFinal = parseFloat(preco.replace('.', '').replace(',', '.'));
+        cesta.push({ nome, valor: valorFinal, id });
         atualizarPainel();
     }
 
@@ -210,7 +217,7 @@
             const total = cesta.reduce((a, b) => a + b.valor, 0);
             document.getElementById('txtQtde').innerText = `${cesta.length} itens`;
             document.getElementById('txtTotal').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-            document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ddd;color:#333;"><span>${item.nome} (ID: ${item.id})</span><button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red;border:none;background:none;font-weight:bold;">X</button></div>`).join('');
+            document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ddd;color:#333;"><span>${item.nome}</span><button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red;border:none;background:none;font-weight:bold;">X</button></div>`).join('');
         } else { painel.style.display = 'none'; document.getElementById('cestaDetalhes').style.display = 'none'; }
     }
 
@@ -220,7 +227,7 @@
     }
 
     function salvarVenda() {
-        if (!pagamentoSelecionado) return alert("Selecione a forma de pagamento!");
+        if (!pagamentoSelecionado) return alert("Selecione o pagamento!");
         if (confirm(`Finalizar venda no ${pagamentoSelecionado}?`)) {
             const nova = { data: new Date().toLocaleString('pt-BR'), itens: cesta, total: cesta.reduce((a, b) => a + b.valor, 0), pagamento: pagamentoSelecionado };
             db.ref('vendas').push(nova).then(() => { alert("Venda registrada!"); cesta = []; pagamentoSelecionado = ""; atualizarPainel(); });
@@ -233,11 +240,10 @@
         if (chaves.length === 0) { lista.innerHTML = "Não há vendas pendentes."; return; }
         lista.innerHTML = chaves.reverse().map(id => {
             const v = vendasPendentes[id];
-            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>💰 Pagamento: <b>${v.pagamento}</b><br>${v.itens.map(i => `• ${i.nome} (ID: ${i.id})`).join('<br>')}<hr>Total: R$ ${v.total.toFixed(2).replace('.', ',')}<br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Excluir</button></div>`;
+            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>💰 Pagamento: <b>${v.pagamento}</b><br>${v.itens.map(i => `• ${i.nome} (ID: ${i.id})`).join('<br>')}<hr>Total: R$ ${v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}<br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Excluir</button></div>`;
         }).join('');
     }
 
-    // --- SCANNER OTIMIZADO IPHONE 12 (RESTAURADO) ---
     function alternarCamera() {
         const r = document.getElementById('reader');
         const ctrl = document.getElementById('scanControls');
@@ -246,10 +252,7 @@
             r.style.display = 'block'; ctrl.style.display = 'block';
             scannerObjeto = new Html5Qrcode("reader");
             scannerObjeto.start({ facingMode: "environment" }, { 
-                fps: 30, 
-                qrbox: { width: 150, height: 80 }, // MIRA PEQUENA PARA FOCO À DISTÂNCIA
-                aspectRatio: 1.0,
-                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8 ]
+                fps: 30, qrbox: { width: 150, height: 80 }, aspectRatio: 1.0 
             }, txt => { fazerBusca(txt); fecharScanner(); });
         }
     }
@@ -257,11 +260,10 @@
     function toggleTorch() {
         if (!scannerObjeto) return;
         isTorchOn = !isTorchOn;
-        scannerObjeto.applyVideoConstraints({ advanced: [{torch: isTorchOn}] })
-        .then(() => { document.getElementById('torchBtn').innerText = isTorchOn ? "🔦 Desligar Lanterna" : "🔦 Ligar Lanterna"; });
+        scannerObjeto.applyVideoConstraints({ advanced: [{torch: isTorchOn}] });
     }
 
-    function fecharScanner() { if (scannerObjeto) scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; document.getElementById('scanControls').style.display = 'none'; isTorchOn = false; }); }
+    function fecharScanner() { if (scannerObjeto) scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; document.getElementById('scanControls').style.display = 'none'; }); }
 
     function uploadExcel() {
         const file = document.getElementById('fileInput').files[0];
@@ -272,7 +274,7 @@
             const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             const lista = json.map(item => {
                 const g = n => { const k = Object.keys(item).find(x => n.includes(x.toLowerCase().trim())); return k ? item[k] : ""; };
-                return { nome: g(['nome','produto']), lab: g(['lab','laboratorio']), barras: g(['barras','ean']), id: g(['id','codigo_interno']), preco: String(g(['preco','valor'])).replace('R$','').trim(), estoque: g(['estoque','qtd']) || "0" };
+                return { nome: g(['nome','produto']), lab: g(['lab','laboratorio']), barras: g(['barras','ean']), id: g(['id','codigo_interno']), preco: g(['preco','valor']), estoque: g(['estoque','qtd']) || "0" };
             });
             db.ref('produtos').set(lista).then(() => { db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); alert("✅ Banco Atualizado!"); });
         };
