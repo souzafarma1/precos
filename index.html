@@ -23,7 +23,7 @@
 
         .container { max-width: 900px; margin: 0 auto; padding: 15px; }
         .tabs { display: flex; justify-content: center; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
-        .tab-btn { padding: 12px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px; flex: 1; min-width: 110px; }
+        .tab-btn { padding: 12px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px; flex: 1; min-width: 100px; font-size: 11px; }
         .tab-btn.active { background: var(--vermelho); color: white; }
 
         .status-sync-bar { text-align: center; font-size: 12px; margin-bottom: 15px; font-weight: bold; color: #666; }
@@ -53,6 +53,13 @@
 
         .venda-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid var(--verde); box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: #333; font-size: 14px; }
         .cesta-detalhes { position: fixed; bottom: 175px; left: 15px; right: 15px; background: white; border-radius: 12px; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); max-height: 40vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
+
+        /* Estilos Independentes da Aba Estoque */
+        .box-estoque { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .input-busca-estoque { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin: 10px 0; font-size: 16px; }
+        
+        /* Estilo do botão de Backup */
+        .btn-backup { background: #6c757d; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -70,11 +77,13 @@
     <div class="tabs">
         <button id="btn-consulta" class="tab-btn active" onclick="mudarAba('aba-consulta')">🔎 BUSCAR</button>
         <button id="btn-vendas" class="tab-btn" onclick="mudarAba('aba-vendas')">📝 PENDENTES</button>
+        <button id="btn-estoque" class="tab-btn" onclick="mudarAba('aba-estoque')">📦 ESTOQUE</button>
         <button id="btn-cadastro" class="tab-btn" onclick="acessoSeguro()">⚙️ ADM</button>
     </div>
 
     <div id="statusSync" class="status-sync-bar">Conectando...</div>
 
+    <!-- ABA CONSULTA (ORIGINAL) -->
     <div id="aba-consulta" class="tab-content active">
         <div id="reader"></div>
         <div class="search-area">
@@ -85,15 +94,41 @@
         <table><tbody id="corpoTabela"></tbody></table>
     </div>
 
+    <!-- ABA VENDAS (ORIGINAL) -->
     <div id="aba-vendas" class="tab-content">
         <div id="listaVendasPendentes"></div>
     </div>
 
+    <!-- ABA ESTOQUE (TOTALMENTE INDEPENDENTE) -->
+    <div id="aba-estoque" class="tab-content">
+        <div class="box-estoque">
+            <h3 style="color:var(--azul); margin-top:0;">📦 Gestão de Estoque Independente</h3>
+            
+            <div style="background:#f0f7ff; padding:15px; border-radius:8px; border:1px dashed var(--azul); text-align:center; margin-bottom:20px;">
+                <button onclick="baixarModeloEstoque()" style="background:#6c757d; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-size:12px; margin-bottom:10px;">📥 Baixar Modelo Planilha</button>
+                <input type="file" id="fileInputIndependente" accept=".xlsx, .xls" style="display:block; margin: 10px auto;">
+                <button onclick="uploadPlanilhaEstoque()" style="background:var(--verde); color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; width:100%; cursor:pointer;">🚀 ATUALIZAR APENAS ESTOQUE</button>
+            </div>
+
+            <input type="text" id="buscaEstoqueIndep" class="input-busca-estoque" placeholder="Filtrar estoque por nome ou código..." onkeyup="filtrarEstoqueIndependente()">
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table style="width:100%; font-size:13px;">
+                    <thead style="background:#eee; position:sticky; top:0;">
+                        <tr><th style="padding:10px; text-align:left;">Produto / Laboratório</th><th style="padding:10px; text-align:center;">Qtd</th></tr>
+                    </thead>
+                    <tbody id="tabelaCorpoEstoque"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA ADM (ORIGINAL) -->
     <div id="aba-cadastro" class="tab-content">
         <div style="background:white; padding:20px; border-radius:10px; text-align:center;">
-            <h3>Sincronizar Planilha</h3>
+            <h3>Sincronizar Planilha de Preços</h3>
             <input type="file" id="fileInput" accept=".xlsx, .xls"><br><br>
-            <button onclick="uploadExcel()" style="background:var(--verde); color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;">🚀 CARREGAR DADOS</button>
+            <button onclick="uploadExcel()" style="background:var(--verde); color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;">🚀 CARREGAR DADOS DE CONSULTA</button>
+            <button onclick="baixarBackupPrecos()" class="btn-backup">📂 BAIXAR BACKUP DE PREÇOS (EXCEL)</button>
         </div>
     </div>
 </div>
@@ -127,11 +162,16 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let listaProdutos = [], cesta = [], vendasPendentes = {}, scannerObjeto;
+    
+    // Variáveis Separadas para Independência Total
+    let listaProdutos = []; // Preços/Consulta
+    let listaEstoqueGlobal = []; // Estoque Independente
+    let cesta = [], vendasPendentes = {}, scannerObjeto;
     let labAtivo = "", pagamentoSelecionado = "";
 
     setInterval(() => { document.getElementById('relogioOnline').innerText = new Date().toLocaleString('pt-BR'); }, 1000);
 
+    // Escuta de Preços (Original)
     db.ref('/').on('value', snap => {
         const d = snap.val() || {};
         listaProdutos = d.produtos || [];
@@ -140,66 +180,132 @@
         renderizarVendas();
     });
 
+    // Escuta de Estoque (Novo Nó Independente)
+    db.ref('estoque_independente').on('value', snap => {
+        listaEstoqueGlobal = snap.val() || [];
+        filtrarEstoqueIndependente();
+    });
+
     function mudarAba(id) {
         if(scannerObjeto) fecharScanner();
         document.querySelectorAll('.tab-content, .tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        document.getElementById('btn-' + (id.split('-')[1] === 'vendas' ? 'vendas' : id.split('-')[1])).classList.add('active');
+        document.getElementById('btn-' + id.split('-')[1]).classList.add('active');
     }
 
     function acessoSeguro() { if(prompt("Senha:") === "souza123") mudarAba('aba-cadastro'); }
 
+    // --- FUNÇÕES ORIGINAIS DE CONSULTA ---
     function fazerBusca(t) {
         const input = document.getElementById('searchInput');
         if(t) input.value = t;
         const termo = input.value.toLowerCase();
         const corpo = document.getElementById('corpoTabela');
         if (termo.length < 2) { corpo.innerHTML = ""; return; }
+        let filtrados = listaProdutos.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
+        const labs = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
+        document.getElementById('filtroLabs').innerHTML = labs.length > 1 ? `<div class="lab-tag ${labAtivo === "" ? "active" : ""}" onclick="setLab('')">TODOS</div>` + labs.map(l => `<div class="lab-tag ${labAtivo === l ? "active" : ""}" onclick="setLab('${l}')">${l}</div>`).join('') : "";
+        if (labAtivo !== "") filtrados = filtrados.filter(p => p.lab === labAtivo);
+        corpo.innerHTML = filtrados.slice(0, 30).map(p => {
+            let precoNum = parseFloat(String(p.preco).replace(',', '.'));
+            let precoFmt = isNaN(precoNum) ? "0,00" : precoNum.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            return `<tr><td><span class="info-prod">${p.nome}</span><span style="font-size:12px;color:#666;">${p.lab || '-'} | Est: ${p.estoque}</span><br><small style="color:#003399; font-weight:bold;">B: ${p.barras || '---'} | ID: ${p.id}</small><br><button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;" onclick="addCesta('${p.nome}', '${precoFmt}', '${p.id}')">➕ Adicionar</button></td><td class="preco">R$ ${precoFmt}</td></tr>`;
+        }).join('');
+    }
 
-        let filtrados = listaProdutos.filter(p => 
+    function uploadExcel() {
+        const file = document.getElementById('fileInput').files[0];
+        if(!file) return alert("Selecione o arquivo!");
+        const leitor = new FileReader();
+        leitor.onload = function(e) {
+            const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            const lista = json.map(item => {
+                const g = n => { 
+                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().trim().includes(val))); 
+                    return k ? String(item[k]).trim() : ""; 
+                };
+                return { nome: g(['nome','produto']), lab: g(['lab','fabricante']), barras: g(['barras','ean']), id: g(['id','ref']), preco: g(['preco','valor']), estoque: g(['estoque','qtd']) || "0" };
+            });
+            db.ref('produtos').set(lista).then(() => { db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); alert("✅ Consulta Atualizada!"); });
+        };
+        leitor.readAsArrayBuffer(file);
+    }
+
+    // --- NOVAS FUNÇÕES INDEPENDENTES DE ESTOQUE ---
+    function uploadPlanilhaEstoque() {
+        const file = document.getElementById('fileInputIndependente').files[0];
+        if(!file) return alert("Selecione o arquivo de estoque!");
+        const leitor = new FileReader();
+        leitor.onload = function(e) {
+            const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            const listaEstoque = json.map(item => {
+                const g = n => { 
+                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().trim().includes(val))); 
+                    return k ? String(item[k]).trim() : ""; 
+                };
+                return { 
+                    nome: g(['nome','produto']), 
+                    lab: g(['lab','fabricante']), 
+                    barras: g(['barras','ean']), 
+                    id: g(['id','ref']), 
+                    estoque: g(['estoque','qtd']) || "0" 
+                };
+            });
+            db.ref('estoque_independente').set(listaEstoque).then(() => { alert("✅ Estoque Atualizado de forma independente!"); });
+        };
+        leitor.readAsArrayBuffer(file);
+    }
+
+    function filtrarEstoqueIndependente() {
+        const termo = document.getElementById('buscaEstoqueIndep').value.toLowerCase();
+        const corpo = document.getElementById('tabelaCorpoEstoque');
+        const filtrados = listaEstoqueGlobal.filter(p => 
             String(p.nome).toLowerCase().includes(termo) || 
             String(p.barras).includes(termo) || 
             String(p.id).toLowerCase().includes(termo)
         );
-
-        const labs = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
-        document.getElementById('filtroLabs').innerHTML = labs.length > 1 ? `<div class="lab-tag ${labAtivo === "" ? "active" : ""}" onclick="setLab('')">TODOS</div>` + labs.map(l => `<div class="lab-tag ${labAtivo === l ? "active" : ""}" onclick="setLab('${l}')">${l}</div>`).join('') : "";
-
-        if (labAtivo !== "") filtrados = filtrados.filter(p => p.lab === labAtivo);
-
-        corpo.innerHTML = filtrados.slice(0, 30).map(p => {
-            let precoNum = parseFloat(String(p.preco).replace(',', '.'));
-            let precoFmt = isNaN(precoNum) ? "0,00" : precoNum.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            
-            return `
-                <tr>
-                    <td>
-                        <span class="info-prod">${p.nome}</span>
-                        <span style="font-size:12px;color:#666;">${p.lab || '-'} | Est: ${p.estoque}</span><br>
-                        <small style="color:#003399; font-weight:bold;">B: ${p.barras || '---'} | ID: ${p.id}</small><br>
-                        <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;" onclick="addCesta('${p.nome}', '${precoFmt}', '${p.id}')">➕ Adicionar</button>
-                    </td>
-                    <td class="preco">R$ ${precoFmt}</td>
-                </tr>
-            `;
-        }).join('');
+        corpo.innerHTML = filtrados.map(p => `
+            <tr>
+                <td style="padding:10px; border-bottom:1px solid #eee;">
+                    <span style="font-weight:bold; display:block;">${p.nome}</span>
+                    <span style="font-size:11px; color:#666;">Lab: ${p.lab || '-'} | EAN: ${p.barras || '-'}</span>
+                </td>
+                <td style="text-align:center; font-weight:bold; color:var(--azul); border-bottom:1px solid #eee;">${p.estoque}</td>
+            </tr>
+        `).join('');
     }
 
-    function setLab(l) { labAtivo = l; fazerBusca(); }
+    function baixarModeloEstoque() {
+        const ws = XLSX.utils.aoa_to_sheet([["ID", "Nome", "Lab", "Barras", "Estoque"]]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Estoque");
+        XLSX.writeFile(wb, "Modelo_Estoque_Independente.xlsx");
+    }
 
+    // --- FUNÇÃO DE BACKUP DE PREÇOS ---
+    function baixarBackupPrecos() {
+        if (listaProdutos.length === 0) return alert("Sem dados de preços para backup!");
+        const ws = XLSX.utils.json_to_sheet(listaProdutos);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Backup_Precos");
+        XLSX.writeFile(wb, "Backup_Precos_SouzaFarma.xlsx");
+    }
+
+    // --- MANUTENÇÃO DAS OUTRAS FUNÇÕES ---
+    function setLab(l) { labAtivo = l; fazerBusca(); }
     function addCesta(nome, preco, id) {
         let v = parseFloat(preco.replace('.', '').replace(',', '.'));
         cesta.push({ nome, valor: v, id });
         atualizarPainel();
     }
-
     function selecionarPagamento(tipo) {
         pagamentoSelecionado = tipo;
         document.querySelectorAll('.btn-pag').forEach(btn => btn.classList.remove('selected'));
         const normalId = tipo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
         document.getElementById('pag-' + (normalId === 'debito' ? 'debito' : (normalId === 'credito' ? 'credito' : normalId))).classList.add('selected');
     }
-
     function atualizarPainel() {
         const p = document.getElementById('painelCesta');
         if (cesta.length > 0) {
@@ -210,43 +316,22 @@
             document.getElementById('cestaDetalhes').innerHTML = cesta.map((item, i) => `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ddd;color:#333;"><span>${item.nome}</span><button onclick="cesta.splice(${i}, 1); atualizarPainel();" style="color:red;border:none;background:none;font-weight:bold;">X</button></div>`).join('');
         } else { p.style.display = 'none'; document.getElementById('cestaDetalhes').style.display = 'none'; }
     }
-
-    function toggleDetalhes() {
-        const d = document.getElementById('cestaDetalhes');
-        d.style.display = d.style.display === 'block' ? 'none' : 'block';
-    }
-
+    function toggleDetalhes() { const d = document.getElementById('cestaDetalhes'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
     function salvarVenda() {
         if (!pagamentoSelecionado) return alert("Selecione o pagamento!");
-        const nova = { 
-            data: new Date().toLocaleString('pt-BR'), 
-            itens: cesta, 
-            total: cesta.reduce((a, b) => a + b.valor, 0), 
-            pagamento: pagamentoSelecionado 
-        };
+        const nova = { data: new Date().toLocaleString('pt-BR'), itens: cesta, total: cesta.reduce((a, b) => a + b.valor, 0), pagamento: pagamentoSelecionado };
         db.ref('vendas').push(nova).then(() => { alert("Venda registrada!"); cesta = []; pagamentoSelecionado = ""; atualizarPainel(); });
     }
-
     function renderizarVendas() {
         const lista = document.getElementById('listaVendasPendentes');
         const chaves = Object.keys(vendasPendentes);
         if (chaves.length === 0) { lista.innerHTML = "<p style='text-align:center'>Sem vendas pendentes.</p>"; return; }
         lista.innerHTML = chaves.reverse().map(id => {
             const v = vendasPendentes[id];
-            // RESTAURADO: Exibição do ID Interno na listagem de vendas
-            let itensHtml = v.itens.map(i => `• ${i.nome} <span style="color:#003399">(ID: ${i.id})</span>`).join('<br>');
-            return `
-                <div class="venda-card">
-                    <strong>📅 ${v.data}</strong><br>
-                    💰 Pagamento: <b>${v.pagamento}</b><br>
-                    <div style="margin:8px 0;">${itensHtml}</div>
-                    <hr>
-                    <b>Total: R$ ${v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b><br>
-                    <button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Lançado (Excluir)</button>
-                </div>`;
+            let itensHtml = v.itens.map(i => `• ${i.nome}`).join('<br>');
+            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>💰 Pagamento: <b>${v.pagamento}</b><br><div style="margin:8px 0;">${itensHtml}</div><hr><b>Total: R$ ${v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b><br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Lançado (Excluir)</button></div>`;
         }).join('');
     }
-
     function alternarCamera() {
         const r = document.getElementById('reader');
         if (r.style.display === 'block') fecharScanner();
@@ -256,38 +341,7 @@
             scannerObjeto.start({ facingMode: "environment" }, { fps: 30, qrbox: { width: 150, height: 80 } }, txt => { fazerBusca(txt); fecharScanner(); });
         }
     }
-
     function fecharScanner() { if (scannerObjeto) scannerObjeto.stop().then(() => { document.getElementById('reader').style.display = 'none'; }); }
-
-    function uploadExcel() {
-        const file = document.getElementById('fileInput').files[0];
-        if(!file) return alert("Selecione o arquivo!");
-        const leitor = new FileReader();
-        leitor.onload = function(e) {
-            const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
-            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            const lista = json.map(item => {
-                // FUNÇÃO DE BUSCA DE COLUNA MELHORADA (Mapeia nomes comuns)
-                const g = n => { 
-                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().trim().includes(val))); 
-                    return k ? String(item[k]).trim() : ""; 
-                };
-                return { 
-                    nome: g(['nome','produto','desc']), 
-                    lab: g(['lab','fabricante']), 
-                    barras: g(['barras','ean','codigo_barras']), // Captura EAN ou Barras
-                    id: g(['id','codigo_interno','cod_interno','ref']), // Captura o ID interno
-                    preco: g(['preco','valor','venda']), 
-                    estoque: g(['estoque','qtd','atual']) || "0" 
-                };
-            });
-            db.ref('produtos').set(lista).then(() => { 
-                db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); 
-                alert("✅ Planilha carregada com sucesso!"); 
-            });
-        };
-        leitor.readAsArrayBuffer(file);
-    }
 </script>
 </body>
 </html>
