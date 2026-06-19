@@ -225,7 +225,7 @@
         }).join('');
     }
 
-    // --- MAPEAMENTO ATUALIZADO PARA RECONHECER "codigo_interno" ---
+    // --- IMPORTAÇÃO AVANÇADA COM HIGIENIZAÇÃO COMPLETA DE COLUNAS ---
     function uploadExcel() {
         const file = document.getElementById('fileInput').files[0];
         if(!file) return alert("Selecione o arquivo!");
@@ -233,21 +233,34 @@
         leitor.onload = function(e) {
             const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
             const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            
             const lista = json.map(item => {
+                // Função robusta que ignora acentos, espaços, sublinhados (_) e maiúsculas nas chaves
                 const g = n => { 
-                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().replace(/[^a-z0-9]/g, '').trim().includes(val))); 
+                    const k = Object.keys(item).find(x => {
+                        let chaveLimpa = x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '').trim();
+                        return n.some(val => chaveLimpa.includes(val));
+                    });
                     return k ? String(item[k]).trim() : ""; 
                 };
+
                 return { 
                     nome: g(['nome','produto']), 
                     lab: g(['laboratorio','lab','fabricante']), 
                     barras: g(['codigobarras','barras','ean']), 
-                    id: g(['codigointerno','id','ref']), 
+                    id: g(['codigointerno','interno','id','ref']), 
                     preco: g(['preco','valor']), 
                     estoque: g(['estoque','qtd']) || "0" 
                 };
             });
-            db.ref('produtos').set(lista).then(() => { db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); alert("✅ Consulta Atualizada com Código Interno!"); });
+
+            // Força a limpeza completa do banco antes de salvar para evitar conflitos de cache
+            db.ref('produtos').remove().then(() => {
+                db.ref('produtos').set(lista).then(() => { 
+                    db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); 
+                    alert("✅ Consulta Atualizada com sucesso! Verifique a busca agora."); 
+                });
+            });
         };
         leitor.readAsArrayBuffer(file);
     }
@@ -261,14 +274,17 @@
             const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             const listaEstoque = json.map(item => {
                 const g = n => { 
-                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().replace(/[^a-z0-9]/g, '').trim().includes(val))); 
+                    const k = Object.keys(item).find(x => {
+                        let chaveLimpa = x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '').trim();
+                        return n.some(val => chaveLimpa.includes(val));
+                    });
                     return k ? String(item[k]).trim() : ""; 
                 };
                 return { 
                     nome: g(['nome','produto']), 
                     lab: g(['laboratorio','lab','fabricante']), 
                     barras: g(['codigobarras','barras','ean']), 
-                    id: g(['codigointerno','id','ref']), 
+                    id: g(['codigointerno','interno','id','ref']), 
                     estoque: g(['estoque','qtd']) || "0" 
                 };
             });
