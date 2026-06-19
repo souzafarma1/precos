@@ -186,25 +186,28 @@
 
     function acessoSeguro() { if(prompt("Senha:") === "souza123") mudarAba('aba-cadastro'); }
 
-    // --- CORREÇÃO DA BUSCA ---
     function fazerBusca(t) {
         const input = document.getElementById('searchInput');
         if(t) input.value = t;
-        const termo = input.value.toLowerCase();
+        const termo = input.value.toLowerCase().trim();
         const corpo = document.getElementById('corpoTabela');
         if (termo.length < 2) { corpo.innerHTML = ""; return; }
         
-        let filtrados = listaProdutos.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
+        let filtrados = listaProdutos.filter(p => 
+            String(p.nome).toLowerCase().includes(termo) || 
+            String(p.barras).includes(termo) || 
+            String(p.id).toLowerCase().trim() === termo ||
+            String(p.id).toLowerCase().includes(termo)
+        );
         const labs = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
         
         document.getElementById('filtroLabs').innerHTML = labs.length > 1 ? `<div class="lab-tag ${labAtivo === "" ? "active" : ""}" onclick="setLab('')">TODOS</div>` + labs.map(l => `<div class="lab-tag ${labAtivo === l ? "active" : ""}" onclick="setLab('${l}')">${l}</div>`).join('') : "";
         if (labAtivo !== "") filtrados = filtrados.filter(p => p.lab === labAtivo);
         
         corpo.innerHTML = filtrados.slice(0, 30).map(p => {
-            let precoNum = parseFloat(String(p.preco).replace(',', '.'));
+            let precoNum = parseFloat(String(p.preco).replace('R$', '').replace('.', '').replace(',', '.').trim());
             let precoFmt = isNaN(precoNum) ? "0,00" : precoNum.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             
-            // Tratamento preventivo de strings para não quebrar o HTML interno
             let codBarras = p.barras ? String(p.barras).trim() : '---';
             let codId = p.id ? String(p.id).trim() : '---';
             let nomeProd = String(p.nome).replace(/'/g, "\\'"); 
@@ -222,6 +225,7 @@
         }).join('');
     }
 
+    // --- MAPEAMENTO ATUALIZADO PARA RECONHECER "codigo_interno" ---
     function uploadExcel() {
         const file = document.getElementById('fileInput').files[0];
         if(!file) return alert("Selecione o arquivo!");
@@ -231,12 +235,19 @@
             const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             const lista = json.map(item => {
                 const g = n => { 
-                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().trim().includes(val))); 
+                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().replace(/[^a-z0-9]/g, '').trim().includes(val))); 
                     return k ? String(item[k]).trim() : ""; 
                 };
-                return { nome: g(['nome','produto']), lab: g(['lab','fabricante']), barras: g(['barras','ean']), id: g(['id','ref']), preco: g(['preco','valor']), estoque: g(['estoque','qtd']) || "0" };
+                return { 
+                    nome: g(['nome','produto']), 
+                    lab: g(['laboratorio','lab','fabricante']), 
+                    barras: g(['codigobarras','barras','ean']), 
+                    id: g(['codigointerno','id','ref']), 
+                    preco: g(['preco','valor']), 
+                    estoque: g(['estoque','qtd']) || "0" 
+                };
             });
-            db.ref('produtos').set(lista).then(() => { db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); alert("✅ Consulta Atualizada!"); });
+            db.ref('produtos').set(lista).then(() => { db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); alert("✅ Consulta Atualizada com Código Interno!"); });
         };
         leitor.readAsArrayBuffer(file);
     }
@@ -250,10 +261,16 @@
             const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             const listaEstoque = json.map(item => {
                 const g = n => { 
-                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().trim().includes(val))); 
+                    const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().replace(/[^a-z0-9]/g, '').trim().includes(val))); 
                     return k ? String(item[k]).trim() : ""; 
                 };
-                return { nome: g(['nome','produto']), lab: g(['lab','fabricante']), barras: g(['barras','ean']), id: g(['id','ref']), estoque: g(['estoque','qtd']) || "0" };
+                return { 
+                    nome: g(['nome','produto']), 
+                    lab: g(['laboratorio','lab','fabricante']), 
+                    barras: g(['codigobarras','barras','ean']), 
+                    id: g(['codigointerno','id','ref']), 
+                    estoque: g(['estoque','qtd']) || "0" 
+                };
             });
             db.ref('estoque_independente').set(listaEstoque).then(() => { alert("✅ Estoque Atualizado de forma independente!"); });
         };
@@ -268,7 +285,7 @@
             <tr>
                 <td style="padding:10px; border-bottom:1px solid #eee;">
                     <span style="font-weight:bold; display:block;">${p.nome}</span>
-                    <span style="font-size:11px; color:#666;">Lab: ${p.lab || '-'} | EAN: ${p.barras || '-'}</span>
+                    <span style="font-size:11px; color:#666;">Lab: ${p.lab || '-'} | EAN: ${p.barras || '-'} | ID: ${p.id || '-'}</span>
                 </td>
                 <td style="text-align:center; font-weight:bold; color:var(--azul); border-bottom:1px solid #eee;">${p.estoque}</td>
             </tr>
@@ -276,7 +293,7 @@
     }
 
     function baixarModeloEstoque() {
-        const ws = XLSX.utils.aoa_to_sheet([["ID", "Nome", "Lab", "Barras", "Estoque"]]);
+        const ws = XLSX.utils.aoa_to_sheet([["codigo_interno", "nome", "laboratorio", "codigo_barras", "Estoque"]]);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Estoque");
         XLSX.writeFile(wb, "Modelo_Estoque_Independente.xlsx");
@@ -329,7 +346,6 @@
         db.ref('vendas').push(nova).then(() => { alert("Venda registrada!"); cesta = []; pagamentoSelecionado = ""; atualizarPainel(); });
     }
 
-    // --- CORREÇÃO DA RENDERIZAÇÃO DE VENDAS PENDENTES (EXIBINDO PREÇO UNITÁRIO, ID E EAN) ---
     function renderizarVendas() {
         const lista = document.getElementById('listaVendasPendentes');
         const chaves = Object.keys(vendasPendentes);
