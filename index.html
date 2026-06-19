@@ -54,11 +54,9 @@
         .venda-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid var(--verde); box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: #333; font-size: 14px; }
         .cesta-detalhes { position: fixed; bottom: 175px; left: 15px; right: 15px; background: white; border-radius: 12px; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); max-height: 40vh; overflow-y: auto; display: none; z-index: 999; border: 2px solid var(--azul); }
 
-        /* Estilos Independentes da Aba Estoque */
         .box-estoque { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .input-busca-estoque { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin: 10px 0; font-size: 16px; }
         
-        /* Estilo do botão de Backup */
         .btn-backup { background: #6c757d; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 15px; cursor: pointer; }
     </style>
 </head>
@@ -159,15 +157,13 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     
-    // Variáveis Separadas para Independência Total
-    let listaProdutos = []; // Preços/Consulta
-    let listaEstoqueGlobal = []; // Estoque Independente
+    let listaProdutos = []; 
+    let listaEstoqueGlobal = []; 
     let cesta = [], vendasPendentes = {}, scannerObjeto;
     let labAtivo = "", pagamentoSelecionado = "";
 
     setInterval(() => { document.getElementById('relogioOnline').innerText = new Date().toLocaleString('pt-BR'); }, 1000);
 
-    // Escuta de Preços (Original)
     db.ref('/').on('value', snap => {
         const d = snap.val() || {};
         listaProdutos = d.produtos || [];
@@ -176,7 +172,6 @@
         renderizarVendas();
     });
 
-    // Escuta de Estoque (Novo Nó Independente)
     db.ref('estoque_independente').on('value', snap => {
         listaEstoqueGlobal = snap.val() || [];
         filtrarEstoqueIndependente();
@@ -191,22 +186,39 @@
 
     function acessoSeguro() { if(prompt("Senha:") === "souza123") mudarAba('aba-cadastro'); }
 
-    // --- FUNÇÕES ORIGINAIS DE CONSULTA ---
+    // --- CORREÇÃO DA BUSCA ---
     function fazerBusca(t) {
         const input = document.getElementById('searchInput');
         if(t) input.value = t;
         const termo = input.value.toLowerCase();
         const corpo = document.getElementById('corpoTabela');
         if (termo.length < 2) { corpo.innerHTML = ""; return; }
+        
         let filtrados = listaProdutos.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
         const labs = [...new Set(filtrados.map(p => p.lab).filter(l => l && l !== "-"))];
+        
         document.getElementById('filtroLabs').innerHTML = labs.length > 1 ? `<div class="lab-tag ${labAtivo === "" ? "active" : ""}" onclick="setLab('')">TODOS</div>` + labs.map(l => `<div class="lab-tag ${labAtivo === l ? "active" : ""}" onclick="setLab('${l}')">${l}</div>`).join('') : "";
         if (labAtivo !== "") filtrados = filtrados.filter(p => p.lab === labAtivo);
+        
         corpo.innerHTML = filtrados.slice(0, 30).map(p => {
             let precoNum = parseFloat(String(p.preco).replace(',', '.'));
             let precoFmt = isNaN(precoNum) ? "0,00" : precoNum.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            // Adicionado barras e id como argumentos para a função addCesta
-            return `<tr><td><span class="info-prod">${p.nome}</span><span style="font-size:12px;color:#666;">${p.lab || '-'} | Est: ${p.estoque}</span><br><small style="color:#003399; font-weight:bold;">B: ${p.barras || '---'} | ID: ${p.id}</small><br><button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;" onclick="addCesta('${p.nome}', '${precoFmt}', '${p.id}', '${p.barras}')">➕ Adicionar</button></td><td class="preco">R$ ${precoFmt}</td></tr>`;
+            
+            // Tratamento preventivo de strings para não quebrar o HTML interno
+            let codBarras = p.barras ? String(p.barras).trim() : '---';
+            let codId = p.id ? String(p.id).trim() : '---';
+            let nomeProd = String(p.nome).replace(/'/g, "\\'"); 
+
+            return `<tr>
+                <td>
+                    <span class="info-prod">${p.nome}</span>
+                    <span style="font-size:12px;color:#666;">${p.lab || '-'} | Est: ${p.estoque}</span><br>
+                    <small style="color:#003399; font-weight:bold;">B: ${codBarras} | ID: ${codId}</small><br>
+                    <button style="background:var(--azul);color:white;border:none;padding:8px;border-radius:5px;margin-top:8px;cursor:pointer;" 
+                        onclick="addCesta('${nomeProd}', '${precoFmt}', '${codId}', '${codBarras}')">➕ Adicionar</button>
+                </td>
+                <td class="preco">R$ ${precoFmt}</td>
+            </tr>`;
         }).join('');
     }
 
@@ -229,7 +241,6 @@
         leitor.readAsArrayBuffer(file);
     }
 
-    // --- NOVAS FUNÇÕES INDEPENDENTES DE ESTOQUE ---
     function uploadPlanilhaEstoque() {
         const file = document.getElementById('fileInputIndependente').files[0];
         if(!file) return alert("Selecione o arquivo de estoque!");
@@ -242,13 +253,7 @@
                     const k = Object.keys(item).find(x => n.some(val => x.toLowerCase().trim().includes(val))); 
                     return k ? String(item[k]).trim() : ""; 
                 };
-                return { 
-                    nome: g(['nome','produto']), 
-                    lab: g(['lab','fabricante']), 
-                    barras: g(['barras','ean']), 
-                    id: g(['id','ref']), 
-                    estoque: g(['estoque','qtd']) || "0" 
-                };
+                return { nome: g(['nome','produto']), lab: g(['lab','fabricante']), barras: g(['barras','ean']), id: g(['id','ref']), estoque: g(['estoque','qtd']) || "0" };
             });
             db.ref('estoque_independente').set(listaEstoque).then(() => { alert("✅ Estoque Atualizado de forma independente!"); });
         };
@@ -258,11 +263,7 @@
     function filtrarEstoqueIndependente() {
         const termo = document.getElementById('buscaEstoqueIndep').value.toLowerCase();
         const corpo = document.getElementById('tabelaCorpoEstoque');
-        const filtrados = listaEstoqueGlobal.filter(p => 
-            String(p.nome).toLowerCase().includes(termo) || 
-            String(p.barras).includes(termo) || 
-            String(p.id).toLowerCase().includes(termo)
-        );
+        const filtrados = listaEstoqueGlobal.filter(p => String(p.nome).toLowerCase().includes(termo) || String(p.barras).includes(termo) || String(p.id).toLowerCase().includes(termo));
         corpo.innerHTML = filtrados.map(p => `
             <tr>
                 <td style="padding:10px; border-bottom:1px solid #eee;">
@@ -281,7 +282,6 @@
         XLSX.writeFile(wb, "Modelo_Estoque_Independente.xlsx");
     }
 
-    // --- FUNÇÃO DE BACKUP DE PREÇOS ---
     function baixarBackupPrecos() {
         if (listaProdutos.length === 0) return alert("Sem dados de preços para backup!");
         const ws = XLSX.utils.json_to_sheet(listaProdutos);
@@ -290,18 +290,11 @@
         XLSX.writeFile(wb, "Backup_Precos_SouzaFarma.xlsx");
     }
 
-    // --- MANUTENÇÃO DAS OUTRAS FUNÇÕES ---
     function setLab(l) { labAtivo = l; fazerBusca(); }
 
-    // Função addCesta atualizada para receber id e barras
     function addCesta(nome, preco, id, barras) {
         let v = parseFloat(preco.replace('.', '').replace(',', '.'));
-        cesta.push({ 
-            nome: nome, 
-            valor: v, 
-            id: id, 
-            barras: barras 
-        });
+        cesta.push({ nome: nome, valor: v, id: id, barras: barras });
         atualizarPainel();
     }
 
@@ -329,22 +322,45 @@
         if (!pagamentoSelecionado) return alert("Selecione o pagamento!");
         const nova = { 
             data: new Date().toLocaleString('pt-BR'), 
-            itens: cesta, // Aqui o 'cesta' já contém id e barras de cada item
+            itens: cesta, 
             total: cesta.reduce((a, b) => a + b.valor, 0), 
             pagamento: pagamentoSelecionado 
         };
         db.ref('vendas').push(nova).then(() => { alert("Venda registrada!"); cesta = []; pagamentoSelecionado = ""; atualizarPainel(); });
     }
 
+    // --- CORREÇÃO DA RENDERIZAÇÃO DE VENDAS PENDENTES (EXIBINDO PREÇO UNITÁRIO, ID E EAN) ---
     function renderizarVendas() {
         const lista = document.getElementById('listaVendasPendentes');
         const chaves = Object.keys(vendasPendentes);
         if (chaves.length === 0) { lista.innerHTML = "<p style='text-align:center'>Sem vendas pendentes.</p>"; return; }
+        
         lista.innerHTML = chaves.reverse().map(id => {
             const v = vendasPendentes[id];
-            // Atualizado para exibir Barras e ID nos itens pendentes
-            let itensHtml = v.itens.map(i => `• ${i.nome} <br><small style="color:#003399; margin-left:15px;">(B: ${i.barras || '---'} | ID: ${i.id || '---'})</small>`).join('<br>');
-            return `<div class="venda-card"><strong>📅 ${v.data}</strong><br>💰 Pagamento: <b>${v.pagamento}</b><br><div style="margin:8px 0;">${itensHtml}</div><hr><b>Total: R$ ${v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b><br><button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:10px;">Lançado (Excluir)</button></div>`;
+            
+            let itensHtml = v.itens.map(i => {
+                let itemPreco = typeof i.valor === 'number' ? i.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0,00';
+                return `<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                    <div>
+                        • <b>${i.nome}</b> <br>
+                        <small style="color:#003399; margin-left:12px;">(ID: ${i.id || '---'} | B: ${i.barras || '---'})</small>
+                    </div>
+                    <span style="font-weight: bold; color: #333; white-space: nowrap;">R$ ${itemPreco}</span>
+                </div>`;
+            }).join('');
+            
+            return `<div class="venda-card">
+                <strong>📅 ${v.data}</strong><br>
+                💰 Pagamento: <b>${v.pagamento}</b><br>
+                <div style="margin:12px 0; border-top:1px solid #eee; padding-top:8px;">${itensHtml}</div>
+                <hr style="border: 0; border-top: 1px solid #ddd;">
+                <div style="display:flex; justify-content:space-between; font-size:16px;">
+                    <span><b>Total:</b></span>
+                    <span style="color:var(--vermelho)"><b>R$ ${v.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b></span>
+                </div>
+                <br>
+                <button onclick="db.ref('vendas/${id}').remove()" style="background:var(--vermelho);color:white;border:none;padding:8px;border-radius:5px;width:100%;margin-top:5px;cursor:pointer;font-weight:bold;">Lançado (Excluir)</button>
+            </div>`;
         }).join('');
     }
 
