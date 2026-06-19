@@ -205,7 +205,8 @@
         if (labAtivo !== "") filtrados = filtrados.filter(p => p.lab === labAtivo);
         
         corpo.innerHTML = filtrados.slice(0, 30).map(p => {
-            let precoNum = parseFloat(String(p.preco).replace('R$', '').replace('.', '').replace(',', '.').trim());
+            // Nova conversão segura de amostragem na tela
+            let precoNum = parseFloat(p.preco);
             let precoFmt = isNaN(precoNum) ? "0,00" : precoNum.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             
             let codBarras = p.barras ? String(p.barras).trim() : '---';
@@ -225,7 +226,7 @@
         }).join('');
     }
 
-    // --- IMPORTAÇÃO AVANÇADA COM HIGIENIZAÇÃO COMPLETA DE COLUNAS ---
+    // --- IMPORTAÇÃO DE PREÇOS CORRIGIDA SEM BUG DECIMAL ---
     function uploadExcel() {
         const file = document.getElementById('fileInput').files[0];
         if(!file) return alert("Selecione o arquivo!");
@@ -235,7 +236,6 @@
             const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             
             const lista = json.map(item => {
-                // Função robusta que ignora acentos, espaços, sublinhados (_) e maiúsculas nas chaves
                 const g = n => { 
                     const k = Object.keys(item).find(x => {
                         let chaveLimpa = x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '').trim();
@@ -244,21 +244,40 @@
                     return k ? String(item[k]).trim() : ""; 
                 };
 
+                // Trata o campo de preço da planilha impedindo deslocamento de vírgulas
+                let valPrecoRaw = g(['preco','valor']);
+                let valorFinal = 0;
+
+                if (valPrecoRaw) {
+                    // Remove R$ e espaços em branco
+                    let strLimpa = valPrecoRaw.replace('R$', '').trim();
+                    
+                    if (strLimpa.includes(',') && strLimpa.includes('.')) {
+                        // Formato internacional complexo com milhar: 1.200,50 -> 1200.50
+                        strLimpa = strLimpa.replace(/\./g, '').replace(',', '.');
+                    } else if (strLimpa.includes(',')) {
+                        // Formato comum PT-BR: 24,50 -> 24.50
+                        strLimpa = strLimpa.replace(',', '.');
+                    }
+                    
+                    valorFinal = parseFloat(strLimpa);
+                    if (isNaN(valorFinal)) valorFinal = 0;
+                }
+
                 return { 
                     nome: g(['nome','produto']), 
                     lab: g(['laboratorio','lab','fabricante']), 
                     barras: g(['codigobarras','barras','ean']), 
                     id: g(['codigointerno','interno','id','ref']), 
-                    preco: g(['preco','valor']), 
+                    preco: valorFinal, // Guarda como número puro estruturado
                     estoque: g(['estoque','qtd']) || "0" 
                 };
             });
 
-            // Força a limpeza completa do banco antes de salvar para evitar conflitos de cache
             db.ref('produtos').remove().then(() => {
                 db.ref('produtos').set(lista).then(() => { 
                     db.ref('ultima_atualizacao').set(new Date().toLocaleString('pt-BR')); 
-                    alert("✅ Consulta Atualizada com sucesso! Verifique a busca agora."); 
+                    alert("✅ Consulta Atualizada com os preços corretos!"); 
                 });
             });
         };
@@ -288,7 +307,7 @@
                     estoque: g(['estoque','qtd']) || "0" 
                 };
             });
-            db.ref('estoque_independente').set(listaEstoque).then(() => { alert("✅ Estoque Atualizado de forma independente!"); });
+            db.ref('estoque_independente').set(listaEstoque).then(() => { alert("✅ Estoque Atualizado!"); });
         };
         leitor.readAsArrayBuffer(file);
     }
